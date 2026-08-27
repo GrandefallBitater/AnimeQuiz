@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Выбери аниме картинку</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f4f7f6;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        h1 { color: #2c3e50; }
+        .image-container {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        .card {
+            background: white;
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        img {
+            max-width: 280px;
+            border-radius: 8px;
+            display: block;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #2980b9; }
+        .result {
+            margin-top: 30px;
+            font-size: 18px;
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .result a {
+            color: #3498db;
+            text-decoration: none;
+            margin-left: 10px;
+        }
+        .result a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<h1>🎨 Выбери аниме картинку!</h1>
+
+<div class="image-container">
+    <div class="card">
+        <img th:src="${images[0]}" alt="Вариант 1">
+        <form th:action="@{/choose}" method="post">
+            <input type="hidden" name="index" value="0">
+            <button type="submit">Выбрать эту</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <img th:src="${images[1]}" alt="Вариант 2">
+        <form th:action="@{/choose}" method="post">
+            <input type="hidden" name="index" value="1">
+            <button type="submit">Выбрать эту</button>
+        </form>
+    </div>
+</div>
+
+<div class="result" th:if="${chosen != null}">
+    <p>✅ Ты выбрал картинку №<span th:text="${chosen + 1}"></span>!</p>
+    <a th:href="@{/}">🔄 Попробовать снова</a>
+</div>
+</body>
+</html>

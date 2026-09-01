@@ -1,0 +1,564 @@
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #0d0d1a !important;
+    color: #e0e0e0;
+    overflow-x: hidden;
+    position: relative;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: -1;
+    background: radial-gradient(circle at 30% 50%, rgba(138, 43, 226, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 70% 50%, rgba(255, 105, 180, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 50% 30%, rgba(100, 200, 255, 0.05) 0%, transparent 40%);
+    animation: bgPulse 8s ease-in-out infinite;
+}
+
+
+/* ===== Hero-секция ===== */
+.hero-section {
+    position: relative;
+    min-height: 85vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    /*background: linear-gradient(135deg, #0d0d1a 0%, #1a1a3e 40%, #2d1b69 70%, #0d0d1a 100%);*/
+    overflow: hidden;
+}
+
+@keyframes bgPulse {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    50% { transform: scale(1.1) rotate(3deg); }
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+    max-width: 800px;
+    padding: 2rem;
+}
+
+.hero-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #ff6b9d, #c44dff);
+    color: white;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.5rem 1.5rem;
+    border-radius: 50px;
+    margin-bottom: 1.5rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    animation: fadeInDown 0.8s ease-out;
+}
+
+.hero-title {
+    font-size: 4rem;
+    font-weight: 900;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #ffffff 0%, #ff6b9d 50%, #c44dff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: fadeInUp 1s ease-out;
+}
+
+.hero-subtitle {
+    font-size: 1.25rem;
+    color: #b0b0cc;
+    margin-bottom: 3rem;
+    font-weight: 300;
+    line-height: 1.8;
+    animation: fadeInUp 1s ease-out 0.2s both;
+}
+
+/* ===== Главные кнопки ===== */
+.hero-buttons {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    animation: fadeInUp 1s ease-out 0.4s both;
+}
+
+.btn-create-lobby {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 2.5rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    border-radius: 60px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    overflow: hidden;
+}
+
+.btn-create-lobby::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-create-lobby:hover::before {
+    left: 100%;
+}
+
+.btn-primary-lobby {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: white;
+    box-shadow: 0 4px 25px rgba(124, 58, 237, 0.4),
+    0 0 60px rgba(124, 58, 237, 0.1);
+}
+
+.btn-primary-lobby:hover {
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 8px 40px rgba(124, 58, 237, 0.6),
+    0 0 80px rgba(124, 58, 237, 0.2);
+    color: white;
+}
+
+.btn-secondary-lobby {
+    background: transparent;
+    color: #ff6b9d;
+    border: 2px solid rgba(255, 107, 157, 0.4);
+    box-shadow: 0 4px 25px rgba(255, 107, 157, 0.1),
+    inset 0 0 25px rgba(255, 107, 157, 0.05);
+}
+
+.btn-secondary-lobby:hover {
+    transform: translateY(-4px) scale(1.05);
+    background: rgba(255, 107, 157, 0.1);
+    border-color: #ff6b9d;
+    color: #ff6b9d;
+    box-shadow: 0 8px 40px rgba(255, 107, 157, 0.3),
+    inset 0 0 25px rgba(255, 107, 157, 0.1);
+}
+
+.btn-icon {
+    font-size: 1.4rem;
+}
+
+/* ===== Секция карусели ===== */
+.carousel-section {
+    padding: 5rem 0;
+    position: relative;
+}
+
+.section-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 3rem;
+    color: #ffffff;
+}
+
+.section-title span {
+    background: linear-gradient(135deg, #ff6b9d, #c44dff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Карточки карусели */
+.anime-card {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    height: 450px;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.anime-card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 20px 60px rgba(138, 43, 226, 0.3);
+}
+
+.anime-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.anime-card:hover img {
+    transform: scale(1.1);
+}
+
+.card-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 2rem 1.5rem 1.5rem;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+}
+
+.card-overlay h3 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 0.5rem;
+}
+
+.card-overlay p {
+    font-size: 0.9rem;
+    color: #b0b0cc;
+    margin-bottom: 1rem;
+}
+
+.card-tags {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.card-tag {
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: rgba(124, 58, 237, 0.3);
+    color: #d4a5ff;
+    border: 1px solid rgba(124, 58, 237, 0.3);
+}
+
+.card-tag.action { background: rgba(255, 69, 0, 0.2); color: #ff9a5c; border-color: rgba(255, 69, 0, 0.3); }
+.card-tag.shonen { background: rgba(255, 107, 157, 0.2); color: #ff9ecb; border-color: rgba(255, 107, 157, 0.3); }
+
+/* ===== Стрелки карусели ===== */
+.carousel-control-prev,
+.carousel-control-next {
+    width: 60px;
+    height: 60px;
+    top: 50%;
+    transform: translateY(-50%);
+    bottom: auto;
+    background: rgba(124, 58, 237, 0.3);
+    border-radius: 50%;
+    backdrop-filter: blur(10px);
+}
+
+.carousel-control-prev { left: -30px; }
+.carousel-control-next { right: -30px; }
+
+.carousel-control-prev-icon,
+.carousel-control-next-icon {
+    width: 24px;
+    height: 24px;
+    filter: brightness(0) invert(1);
+}
+
+/* Индикаторы карусели */
+.carousel-indicators {
+    margin-bottom: -3rem;
+}
+
+.carousel-indicators button {
+    width: 12px !important;
+    height: 12px !important;
+    border-radius: 50% !important;
+    background-color: #7c3aed !important;
+    opacity: 0.4 !important;
+    transition: all 0.3s ease;
+}
+
+.carousel-indicators button.active {
+    opacity: 1 !important;
+    transform: scale(1.3);
+    box-shadow: 0 0 15px rgba(124, 58, 237, 0.6);
+}
+
+/* ===== Секция статистики ===== */
+.stats-section {
+    padding: 5rem 0;
+}
+
+.stat-card {
+    text-align: center;
+    padding: 3rem 2rem;
+    border-radius: 20px;
+    background: linear-gradient(145deg, rgba(26, 26, 62, 0.8), rgba(13, 13, 26, 0.9));
+    border: 1px solid rgba(124, 58, 237, 0.15);
+    transition: all 0.4s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-8px);
+    border-color: rgba(124, 58, 237, 0.4);
+    box-shadow: 0 20px 60px rgba(124, 58, 237, 0.15);
+}
+
+.stat-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.stat-number {
+    font-size: 3rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #7c3aed, #ff6b9d);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.stat-label {
+    font-size: 1rem;
+    color: #8888aa;
+    margin-top: 0.5rem;
+}
+
+/* ===== Секция "Как играть" ===== */
+.how-to-section {
+    padding: 5rem 0;
+}
+
+.step-card {
+    position: relative;
+    text-align: center;
+    padding: 3rem 2rem;
+    border-radius: 20px;
+    background: rgba(26, 26, 62, 0.5);
+    border: 1px solid rgba(124, 58, 237, 0.1);
+    transition: all 0.4s ease;
+}
+
+.step-card:hover {
+    transform: translateY(-5px);
+    background: rgba(26, 26, 62, 0.8);
+    border-color: rgba(124, 58, 237, 0.3);
+}
+
+.step-number {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: white;
+    font-size: 1.1rem;
+}
+
+.step-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1.5rem;
+    display: block;
+}
+
+.step-card h4 {
+    color: #ffffff;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.step-card p {
+    color: #8888aa;
+    line-height: 1.7;
+}
+
+/* ===== CTA-секция (нижняя) ===== */
+.cta-section {
+    padding: 6rem 0;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.cta-content {
+    position: relative;
+    z-index: 2;
+}
+
+.cta-title {
+    font-size: 3rem;
+    font-weight: 900;
+    color: #ffffff;
+    margin-bottom: 1.5rem;
+}
+
+.cta-subtitle {
+    font-size: 1.2rem;
+    color: #b0b0cc;
+    margin-bottom: 3rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.cta-buttons {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* ===== Анимации появления ===== */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(40px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Scroll-анимация (через JS) ===== */
+.reveal-on-scroll {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.reveal-on-scroll.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ===== Адаптивность ===== */
+@media (max-width: 991px) {
+    .hero-title { font-size: 3rem; }
+    .carousel-control-prev,
+    .carousel-control-next { display: none; }
+    .stat-card, .step-card { margin-bottom: 1.5rem; }
+}
+
+@media (max-width: 768px) {
+    .hero-title { font-size: 2.2rem; }
+    .hero-subtitle { font-size: 1rem; }
+    .section-title { font-size: 1.8rem; }
+    .cta-title { font-size: 2rem; }
+    .anime-card { height: 350px; }
+}
+
+@media (max-width: 576px) {
+    .hero-buttons, .cta-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+    .btn-create-lobby {
+        width: 100%;
+        max-width: 320px;
+        justify-content: center;
+    }
+}
+
+/* ===== Кастомный скроллбар ===== */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #0d0d1a; }
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #7c3aed, #ff6b9d);
+    border-radius: 4px;
+}
+
+/* ===== Пользовательская информация ===== */
+.user-welcome {
+    text-align: center;
+    padding: 1.5rem 2.5rem;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(255, 107, 157, 0.05));
+    border-radius: 16px;
+    max-width: 500px;
+    width: 100%;
+    position: relative;
+    z-index: 10;
+    border: 1px solid rgba(124, 58, 237, 0.2);
+    box-shadow: 0 8px 32px rgba(124, 58, 237, 0.15),
+    inset 0 0 30px rgba(124, 58, 237, 0.05);
+    backdrop-filter: blur(10px);
+    margin: 5rem auto 3rem;
+}
+
+.user-welcome p {
+    font-size: 1.2rem;
+    color: #d4a5ff;
+    margin: 0;
+    text-shadow: 0 0 20px rgba(196, 77, 255, 0.3);
+}
+
+.user-welcome span {
+    background: linear-gradient(135deg, #ff6b9d, #c44dff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
+}
+
+/* Убедимся что hero не сдвигается */
+.hero-section {
+    margin-top: 3rem;
+}
+
+/* ===== Свечение для кнопок ===== */
+.glow-purple {
+    animation: glowPulsePurple 3s ease-in-out infinite;
+}
+
+@keyframes glowPulsePurple {
+    0%, 100% { box-shadow: 0 4px 25px rgba(124, 58, 237, 0.4), 0 0 60px rgba(124, 58, 237, 0.1); }
+    50% { box-shadow: 0 4px 35px rgba(124, 58, 237, 0.6), 0 0 80px rgba(124, 58, 237, 0.2); }
+}
+
+.glow-pink {
+    animation: glowPulsePink 3s ease-in-out infinite;
+}
+
+@keyframes glowPulsePink {
+    0%, 100% { box-shadow: 0 4px 25px rgba(255, 107, 157, 0.1), inset 0 0 25px rgba(255, 107, 157, 0.05); }
+    50% { box-shadow: 0 4px 35px rgba(255, 107, 157, 0.3), inset 0 0 25px rgba(255, 107, 157, 0.1); }
+}
+
+.global-floating-icons {
+    position: fixed; /* Фиксируем относительно окна браузера */
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; /* Иконки не мешают кликать по ссылкам/кнопкам */
+    z-index: -2; /* Помещаем ПОД контентом, но над темным фоном body */
+}
+
+.global-floating-icons span {
+    position: absolute;
+    font-size: 2rem;
+    opacity: 0.15; /* Полупрозрачность для фона */
+    animation: floatAroundGlobal 20s ease-in-out infinite;
+    user-select: none; /* Запрет выделения текста значков */
+}
+
+/* Распределяем иконки по разным координатам экрана (в %) */
+.global-floating-icons span:nth-child(1) { top: 15%; left: 8%; animation-delay: 0s; }
+.global-floating-icons span:nth-child(2) { top: 25%; right: 12%; font-size: 3.5rem; animation-delay: 4s; }
+.global-floating-icons span:nth-child(3) { bottom: 20%; left: 15%; animation-delay: 8s; }
+.global-floating-icons span:nth-child(4) { top: 60%; right: 8%; font-size: 2.5rem; animation-delay: 2s; }
+.global-floating-icons span:nth-child(5) { bottom: 35%; left: 80%; animation-delay: 6s; }
+.global-floating-icons span:nth-child(6) { top: 45%; left: 20%; font-size: 1.5rem; animation-delay: 10s; }
+.global-floating-icons span:nth-child(7) { bottom: 10%; right: 30%; animation-delay: 3s; }
+.global-floating-icons span:nth-child(8) { top: 10%; left: 40%; font-size: 2rem; animation-delay: 5s; }
+
+/* Анимация для глобальных иконок (чуть медленнее, чтобы не отвлекала) */
+@keyframes floatAroundGlobal {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); opacity: 0.15; }
+    25% { transform: translate(-20px, -30px) rotate(10deg); opacity: 0.25; }
+    50% { transform: translate(-10px, 20px) rotate(-5deg); opacity: 0.15; }
+    75% { transform: translate(15px, 10px) rotate(8deg); opacity: 0.25; }
+}

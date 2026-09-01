@@ -18,7 +18,7 @@ public class AnimeQuizController {
         this.AnimeQuizService = AnimeQuizService;
     }
 
-    @GetMapping("/")
+    @GetMapping("/test")
     public String showChoice(Model model) {
         model.addAttribute("images", AnimeQuizService.getRandomImages());
         model.addAttribute("chosen", null);

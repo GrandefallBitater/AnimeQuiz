@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AnimeQuiz</title>
+
+    <link rel="icon" type="image/png" th:href="@{server-images/anime-logo.png}">
+
+    <link rel="stylesheet" th:href="@{homePage/home.css}">
+    <link rel="stylesheet" th:href="@{footer.css}">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM"
+          crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+</head>
+<body class="d-flex flex-column min-vh-100">
+
+<div th:replace="~{fragments/header :: header}"></div>
+
+<div class="global-floating-icons">
+    <span>⚔️</span>
+    <span>🌸</span>
+    <span>🎮</span>
+    <span>⭐</span>
+    <span>🔥</span>
+    <span>💫</span>
+    <span>🍥</span>
+    <span>👻</span>
+</div>
+
+<div class="user-section">
+    <div class="user-welcome">
+        <p>Добро пожаловать, <span th:utext="${user}">User</span>!</p>
+    </div>
+</div>
+
+<section class="hero-section">
+    <div class="hero-content">
+        <div class="hero-badge">Anime Quiz</div>
+        <h1 class="hero-title">Проверь свои знания<br>об аниме!</h1>
+        <p class="hero-subtitle">
+            Создай лобби или присоединись к другу — соревнуйтесь в знаниях об аниме,
+            манге и вселенных ваших любимых тайтлов. Кто настоящий отаку?
+        </p>
+
+        <div class="hero-buttons">
+            <a href="#" class="btn-create-lobby btn-primary-lobby glow-purple">
+                Создать лобби
+            </a>
+            <a href="#" class="btn-create-lobby btn-secondary-lobby glow-pink">
+                Подключиться к лобби
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="carousel-section">
+    <div class="container">
+        <h2 class="section-title reveal-on-scroll">Популярные <span>квизы</span></h2>
+
+        <div id="animeCarousel" class="carousel slide carousel-fade reveal-on-scroll" data-bs-ride="carousel" data-bs-interval="5000">
+
+            <div class="carousel-indicators">
+                <button type="button" data-bs-target="#animeCarousel" data-bs-slide-to="0" class="active"></button>
+                <button type="button" data-bs-target="#animeCarousel" data-bs-slide-to="1"></button>
+                <button type="button" data-bs-target="#animeCarousel" data-bs-slide-to="2"></button>
+                <button type="button" data-bs-target="#animeCarousel" data-bs-slide-to="3"></button>
+            </div>
+
+            <div class="carousel-inner">
+
+                <div class="carousel-item active">
+                    <div class="row justify-content-center g-4 align-items-stretch" style="padding: 0 60px;">
+                        <div class="col-md-3 col-sm-6">
+                            <div class="anime-card">
+                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}" alt="Attack on Titan">
+                                <div class="card-overlay">
+                                    <h3>Attack on Titan</h3>
+                                    <p>Эпическая история о борьбе человечества с титанами.</p>
+                                    <div class="card-tags">
+                                        <span class="card-tag action">Экшн</span>
+                                        <span class="card-tag shonen">Сёнэн</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 d-none d-md-block">
+                            <div class="anime-card">
+                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}" alt="Demon Slayer">
+                                <div class="card-overlay">
+                                    <h3>Demon Slayer</h3>
+                                    <p>Бесконечная жажда битв и магия воды.</p>
+                                    <div class="card-tags">
+                                        <span class="card-tag action">Экшн</span>
+                                        <span class="card-tag shonen">Сёнэн</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row justify-content-center g-4 align-items-stretch" style="padding: 0 60px;">
+                        <div class="col-md-3 col-sm-6">
+                            <div class="anime-card">
+                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}" alt="Naruto">
+                                <div class="card-overlay">
+                                    <h3>Naruto</h3>
+                                    <p>Путь ниндзя — путь силы и дружбы.</p>
+                                    <div class="card-tags">
+                                        <span class="card-tag action">Экшн</span>
+                                        <span class="card-tag shonen">Сёнэн</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 d-none d-md-block">
+                            <div class="anime-card">
+                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}" alt="One Piece">
+                                <div class="card-overlay">
+                                    <h3>One Piece</h3>
+                                    <p>Величайшее приключение в мире пиратов.</p>
+                                    <div class="card-tags">
+                                        <span class="card-tag action">Приключения</span>
+                                        <span class="card-tag shonen">Сёнэн</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row justify-content-center g-4 align-items-stretch" style="padding: 0 60px;">
+                        <div class="col-md-3 col-sm-6">
+                            <div class="anime-card">
+                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}" alt="Jujutsu Kaisen">
+                                <div class="card-overlay">
+                                    <h3>Jujutsu Kaisen</h3>
+                                    <p>Мир проклятий и могущественных заклинаний.</p>
+                                    <div class="card-tags">
+                                        <span class="card-tag action">Экшн</span>
+                                        <span class="card-tag shonen">Сёнэн</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 d-none d-md-block">
+                            <div class="anime-card">
+                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}" alt="My Hero Academia">
+                                <div class="card-overlay">
+                                    <h3>My Hero Academia</h3>
+                                    <p>Герои и злодеи — битва за справедливость.</p>
+                                    <div class="card-tags">
+                                        <span class="card-tag action">Супергерои</span>
+                                        <span class="card-tag shonen">Сёнэн</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row justify-content-center g-4 align-items-stretch" style="padding: 0 60px;">
+                        <div class="col-md-3 col-sm-6">
+                            <div class="anime-card">
+                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}" alt="Death Note">
+                                <div class="card-overlay">
+                                    <h3>Death Note</h3>
+                                    <p>Интеллектуальная игра жизни и смерти.</p>
+                                    <div class="card-tags">
+                                        <span class="card-tag action">Триллер</span>
+                                        <span class="card-tag shonen">Сёнен</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 d-none d-md-block">
+                            <div class="anime-card">
+                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}" alt="Spy x Family">
+                                <div class="card-overlay">
+                                    <h3>Spy × Family</h3>
+                                    <p>Семья шпиона, телепата и убийцы.</p>
+                                    <div class="card-tags">
+                                        <span class="card-tag action">Комедия</span>
+                                        <span class="card-tag shonen">Сёнэн</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <button class="carousel-control-prev" type="button" data-bs-target="#animeCarousel" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon"></span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#animeCarousel" data-bs-slide="next">
+                <span class="carousel-control-next-icon"></span>
+            </button>
+        </div>
+    </div>
+</section>
+
+<section class="stats-section">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-3 col-md-6 reveal-on-scroll">
+                <div class="stat-card">
+                    <div class="stat-number" data-target="1500">0</div>
+                    <div class="stat-label">Вопросов</div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 reveal-on-scroll">
+                <div class="stat-card">
+                    <div class="stat-number" data-target="250">0</div>
+                    <div class="stat-label">Аниме в базе</div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 reveal-on-scroll">
+                <div class="stat-card">
+                    <div class="stat-number" data-target="12000">0</div>
+                    <div class="stat-label">Игроков</div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 reveal-on-scroll">
+                <div class="stat-card">
+                    <div class="stat-number" data-target="850">0</div>
+                    <div class="stat-label">Лобби создано</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="how-to-section">
+    <div class="container">
+        <h2 class="section-title reveal-on-scroll">Как <span>играть?</span></h2>
+        <div class="row g-4 mt-3">
+            <div class="col-lg-3 col-md-6 reveal-on-scroll">
+                <div class="step-card">
+                    <span class="step-number">1</span>
+                    <span class="step-icon">📝</span>
+                    <h4>Создайте лобби</h4>
+                    <p>Нажмите «Создать лобби» и получите уникальный код для приглашения друзей.</p>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 reveal-on-scroll">
+                <div class="step-card">
+                    <span class="step-number">2</span>
+                    <span class="step-icon">🔗</span>
+                    <h4>Пригласите друзей</h4>
+                    <p>Отправьте им код лобби или используйте кнопку «Подключиться» для быстрого входа.</p>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 reveal-on-scroll">
+                <div class="step-card">
+                    <span class="step-number">3</span>
+                    <span class="step-icon">🎯</span>
+                    <h4>Выберите режим</h4>
+                    <p>Определите режим квиза — игра на счёт или на интерес.</p>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 reveal-on-scroll">
+                <div class="step-card">
+                    <span class="step-number">4</span>
+                    <span class="step-icon">🏆</span>
+                    <h4>Побеждайте!</h4>
+                    <p>Отвечайте быстрее всех, набирайте очки и станьте главным отаку среди друзей.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="container">
+        <div class="cta-content reveal-on-scroll">
+            <h2 class="cta-title">Готовы проверить свои знания?</h2>
+            <p class="cta-subtitle">
+                Присоединяйтесь к тысячам отаку и докажите, кто настоящий эксперт в мире аниме!
+            </p>
+
+            <div class="cta-buttons">
+                <a href="#" class="btn-create-lobby btn-primary-lobby glow-purple" style="font-size: 1.25rem; padding: 1.2rem 3rem;">
+                    Создать лобби
+                </a>
+                <a href="#" class="btn-create-lobby btn-secondary-lobby glow-pink" style="font-size: 1.25rem; padding: 1.2rem 3rem;">
+                    Подключиться к лобби
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div th:replace="~{fragments/footer :: footer}"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
+        integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"
+        integrity="sha384-fbbOQedDUMZZ5KreZpsbe1LCZPVmfTnH7ois6mU1QK+m14rQ1l2bGBq41eYeM/fS"
+        crossorigin="anonymous"></script>
+
+<script type="text/javascript" th:src="@{jQuerry.js}"></script>
+<script type="text/javascript" th:src="@{homePage/homeScript.js}"></script>
+
+</body>
+</html>

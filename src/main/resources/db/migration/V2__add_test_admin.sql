@@ -5,7 +5,6 @@ VALUES (
            true
        );
 
--- noinspection SqlInsertValues
 INSERT INTO authorities (username, authority)
 VALUES (
            'admin',

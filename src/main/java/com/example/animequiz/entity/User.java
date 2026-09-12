@@ -22,6 +22,9 @@ public class User {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    @Column(name = "display_name")
+    private String displayName;
+
     public User(String username, String password, boolean enabled) {
         this.username = username;
         this.password = password;

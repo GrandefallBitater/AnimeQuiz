@@ -1,5 +1,5 @@
-
-<div th:fragment="header">
+<div th:fragment="header" xmlns:th="http://www.thymeleaf.org"
+     xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark" style="background-color: #0d0d1a !important;">
         <div class="container-fluid">
 
@@ -15,11 +15,11 @@
                         <a class="nav-link active" aria-current="page" href="#">Главная</a>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle active" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             персонализация
                         </a>
-                        <ul class="dropdown-menu active" style="background-color: #0d0d1a !important;" aria-labelledby="navbarDropdown">
-                            <li><a class="dropdown-item" style="color: white" href="/chooseUserName">задать ник</a></li>
+                        <ul class="dropdown-menu" style="background-color: #0d0d1a !important;" aria-labelledby="navbarDropdown">
+                            <li><a href="#" class="dropdown-item" style="color: white" data-bs-toggle="modal" data-bs-target="#usernameModal">задать ник</a></li>
                             <li><a class="dropdown-item" style="color: white" href="/chooseUserPic">задать аватарку</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" style="color: white" href="/profile">профиль</a></li>
@@ -29,7 +29,8 @@
 
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
                     <li class="nav-item">
-                        <a class="nav-link active" href="/login">Войти</a>
+                        <a class="nav-link active" href="/login" sec:authorize ="hasRole('ROLE_ANONYMOUS')">Войти</a>
+                        <a class="nav-link active" href="/logout" sec:authorize ="isAuthenticated()">Выйти</a>
                     </li>
                 </ul>
             </div>

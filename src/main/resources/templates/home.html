@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>AnimeQuiz</title>
@@ -13,7 +14,8 @@
           rel="stylesheet"
           integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM"
           crossorigin="anonymous">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;900&display=swap"
+          rel="stylesheet">
 </head>
 <body class="d-flex flex-column min-vh-100">
 
@@ -60,7 +62,8 @@
     <div class="container">
         <h2 class="section-title reveal-on-scroll">Популярные <span>квизы</span></h2>
 
-        <div id="animeCarousel" class="carousel slide carousel-fade reveal-on-scroll" data-bs-ride="carousel" data-bs-interval="5000">
+        <div id="animeCarousel" class="carousel slide carousel-fade reveal-on-scroll" data-bs-ride="carousel"
+             data-bs-interval="5000">
 
             <div class="carousel-indicators">
                 <button type="button" data-bs-target="#animeCarousel" data-bs-slide-to="0" class="active"></button>
@@ -75,7 +78,8 @@
                     <div class="row justify-content-center g-4 align-items-stretch" style="padding: 0 60px;">
                         <div class="col-md-3 col-sm-6">
                             <div class="anime-card">
-                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}" alt="Attack on Titan">
+                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}"
+                                     alt="Attack on Titan">
                                 <div class="card-overlay">
                                     <h3>Attack on Titan</h3>
                                     <p>Эпическая история о борьбе человечества с титанами.</p>
@@ -137,7 +141,8 @@
                     <div class="row justify-content-center g-4 align-items-stretch" style="padding: 0 60px;">
                         <div class="col-md-3 col-sm-6">
                             <div class="anime-card">
-                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}" alt="Jujutsu Kaisen">
+                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}"
+                                     alt="Jujutsu Kaisen">
                                 <div class="card-overlay">
                                     <h3>Jujutsu Kaisen</h3>
                                     <p>Мир проклятий и могущественных заклинаний.</p>
@@ -150,7 +155,8 @@
                         </div>
                         <div class="col-md-3 col-sm-6 d-none d-md-block">
                             <div class="anime-card">
-                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}" alt="My Hero Academia">
+                                <img th:src="@{server-images/homePageCarousel/deathNotePreview.png}"
+                                     alt="My Hero Academia">
                                 <div class="card-overlay">
                                     <h3>My Hero Academia</h3>
                                     <p>Герои и злодеи — битва за справедливость.</p>
@@ -287,10 +293,12 @@
             </p>
 
             <div class="cta-buttons">
-                <a href="#" class="btn-create-lobby btn-primary-lobby glow-purple" style="font-size: 1.25rem; padding: 1.2rem 3rem;">
+                <a href="#" class="btn-create-lobby btn-primary-lobby glow-purple"
+                   style="font-size: 1.25rem; padding: 1.2rem 3rem;">
                     Создать лобби
                 </a>
-                <a href="#" class="btn-create-lobby btn-secondary-lobby glow-pink" style="font-size: 1.25rem; padding: 1.2rem 3rem;">
+                <a href="#" class="btn-create-lobby btn-secondary-lobby glow-pink"
+                   style="font-size: 1.25rem; padding: 1.2rem 3rem;">
                     Подключиться к лобби
                 </a>
             </div>
@@ -300,12 +308,38 @@
 
 <div th:replace="~{fragments/footer :: footer}"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
-        integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r"
-        crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"
-        integrity="sha384-fbbOQedDUMZZ5KreZpsbe1LCZPVmfTnH7ois6mU1QK+m14rQ1l2bGBq41eYeM/fS"
-        crossorigin="anonymous"></script>
+<div class="modal fade" id="usernameModal" tabindex="-1" aria-labelledby="usernameModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title" id="usernameModalLabel">Смена никнейма</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+
+            <form th:action="@{/setCustomName}" method="post">
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="userName" class="form-label">Новый никнейм:</label>
+                        <input type="text" class="form-control" id="userName" name="userName"
+                               required placeholder="Введите новый ник..." minlength="3" maxlength="20">
+                        <div class="form-text">Никнейм должен быть уникальным.</div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-success">Сохранить изменения</button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 
 <script type="text/javascript" th:src="@{jQuerry.js}"></script>
 <script type="text/javascript" th:src="@{homePage/homeScript.js}"></script>

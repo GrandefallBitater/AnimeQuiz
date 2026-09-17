@@ -19,23 +19,15 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 
-/**
- * Импорт публичного списка аниме пользователя с Shikimori.
- * <p>
- * OAuth не используется — публичные списки доступны с одним лишь заголовком
- * {@code User-Agent} (он обязателен, иначе IP банится). Соблюдаются лимиты
- * {@code 5rps / 90rpm}. Сеть/DNS на устройстве нестабильны, поэтому каждый
- * запрос повторяется несколько раз, прежде чем считать ресурс недоступным.
- */
 @Service
 public class ShikimoriService {
 
     private static final Logger log = LoggerFactory.getLogger(ShikimoriService.class);
 
-    private static final int MAX_ATTEMPTS = 4;      // повтор при сетевых сбоях (в т.ч. DNS)
+    private static final int MAX_ATTEMPTS = 4;
     private static final long RETRY_DELAY_MS = 800;
-    private static final int PAGE_LIMIT = 5000;     // максимум, разрешённый API
-    private static final int MAX_PAGES = 20;        // предохранитель от бесконечного цикла
+    private static final int PAGE_LIMIT = 5000;
+    private static final int MAX_PAGES = 20;
 
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -56,7 +48,6 @@ public class ShikimoriService {
         this.userAgent = userAgent;
     }
 
-    /** Итог импорта: id/ник на Shikimori, число тайтлов и готовый к сохранению JSON. */
     public record ImportResult(long userId, String nickname, int count, String json) {
     }
 
@@ -66,7 +57,6 @@ public class ShikimoriService {
             throw new IllegalArgumentException("Укажите никнейм на Shikimori");
         }
 
-        // ник -> числовой id
         JsonNode user = getJson("/users/" + enc(clean) + "?is_nickname=1");
         if (user == null || !user.hasNonNull("id")) {
             throw new ShikimoriException("Пользователь \"" + clean + "\" не найден на Shikimori");
@@ -74,7 +64,6 @@ public class ShikimoriService {
         long userId = user.get("id").asLong();
         String resolvedNick = user.path("nickname").asText(clean);
 
-        // список аниме постранично
         ArrayNode titles = mapper.createArrayNode();
         for (int page = 1; page <= MAX_PAGES; page++) {
             JsonNode rates = getJson("/users/" + userId + "/anime_rates?limit=" + PAGE_LIMIT + "&page=" + page);
@@ -87,7 +76,7 @@ public class ShikimoriService {
             if (rates.size() < PAGE_LIMIT) {
                 break;
             }
-            sleep(250); // бережём лимит 5rps
+            sleep(250);
         }
 
         ObjectNode payload = mapper.createObjectNode();
@@ -106,7 +95,6 @@ public class ShikimoriService {
         }
     }
 
-    /** Оставляем только нужные поля тайтла. */
     private ObjectNode projectTitle(JsonNode rate) {
         JsonNode anime = rate.path("anime");
         String name = asTextOrNull(anime, "name");
@@ -120,7 +108,6 @@ public class ShikimoriService {
         t.put("animeId", anime.path("id").asLong());
         t.put("name", name);
         t.put("russian", russian);
-        // готовое к показу название: русское, иначе оригинальное
         t.put("title", (russian != null && !russian.isBlank()) ? russian : name);
         t.put("kind", asTextOrNull(anime, "kind"));
         t.put("animeStatus", asTextOrNull(anime, "status"));
@@ -135,7 +122,6 @@ public class ShikimoriService {
         return v.isMissingNode() || v.isNull() ? null : v.asText();
     }
 
-    /** Ссылки/картинки в API относительные — приводим к абсолютным. */
     private String absolute(String pathOrUrl) {
         if (pathOrUrl == null || pathOrUrl.isBlank()) {
             return null;
@@ -146,10 +132,6 @@ public class ShikimoriService {
         return siteOrigin + (pathOrUrl.startsWith("/") ? "" : "/") + pathOrUrl;
     }
 
-    /**
-     * GET c ретраями. {@code null} — если ресурс отсутствует (404).
-     * Бросает {@link ShikimoriException}, если после всех попыток связи нет.
-     */
     private JsonNode getJson(String path) {
         String url = baseUrl + path;
         IOException lastError = null;
@@ -158,7 +140,7 @@ public class ShikimoriService {
             try {
                 HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                         .timeout(Duration.ofSeconds(20))
-                        .header("User-Agent", userAgent)   // обязателен: без него бан по IP
+                        .header("User-Agent", userAgent)
                         .header("Accept", "application/json")
                         .GET()
                         .build();
@@ -169,7 +151,7 @@ public class ShikimoriService {
                 if (code == 404) {
                     return null;
                 }
-                if (code == 429) { // превышен лимит запросов — ждём подольше
+                if (code == 429) {
                     log.warn("Shikimori 429 (rate limit) на {}, попытка {}/{}", path, attempt, MAX_ATTEMPTS);
                     sleep(RETRY_DELAY_MS * attempt * 2L);
                     continue;
@@ -185,7 +167,6 @@ public class ShikimoriService {
                 return mapper.readTree(resp.body());
 
             } catch (IOException e) {
-                // сюда попадают UnknownHostException (нестабильный DNS), таймауты и обрывы
                 lastError = e;
                 log.warn("Сеть недоступна при обращении к Shikimori ({}), попытка {}/{}: {}",
                         path, attempt, MAX_ATTEMPTS, e.toString());

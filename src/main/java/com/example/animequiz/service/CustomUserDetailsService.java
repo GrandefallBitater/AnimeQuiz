@@ -29,7 +29,6 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("пользователь не найден: " + username));
-//        List<Authority> authorities = authoritiesRepository.findByUser_Username(user.getUsername());
         List<Authority> authorities = authoritiesRepository.findByUserUsernameWithUser(user.getUsername());
         List<GrantedAuthority> grantedAuthorities = authorities.stream()
                 .map(auth -> new SimpleGrantedAuthority(auth.getAuthority()))

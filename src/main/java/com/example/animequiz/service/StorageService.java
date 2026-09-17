@@ -16,14 +16,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-/**
- * Локальное файловое хранилище сервера: аватарки профилей и импортированные
- * списки тайтлов. Корень задаётся свойством {@code app.storage.location}.
- */
 @Service
 public class StorageService {
 
-    // допустимые типы аватарок -> расширение файла
     private static final Map<String, String> ALLOWED_IMAGE_TYPES = Map.of(
             "image/png", "png",
             "image/jpeg", "jpg",
@@ -52,15 +47,12 @@ public class StorageService {
         }
     }
 
-    /** Ключи формируются на сервере (логин/uuid из куки), но чистим на всякий случай. */
     public static String sanitizeKey(String key) {
         if (key == null) throw new IllegalArgumentException("Пустой ключ хранилища");
         String cleaned = key.replaceAll("[^A-Za-z0-9_-]", "_");
         if (cleaned.isBlank()) throw new IllegalArgumentException("Пустой ключ хранилища");
         return cleaned;
     }
-
-    // ----- аватарки ------------------------------------------------------
 
     public String saveAvatar(String key, MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -121,8 +113,6 @@ public class StorageService {
         if (name.endsWith(".webp")) return MediaType.parseMediaType("image/webp");
         return MediaType.IMAGE_JPEG;
     }
-
-    // ----- списки тайтлов ------------------------------------------------
 
     public void saveTitles(String username, byte[] json) {
         Path target = titlesDir.resolve("u_" + sanitizeKey(username) + ".json");

@@ -1,7 +1,9 @@
 package com.example.animequiz.controller;
 
+import com.example.animequiz.Interfaces.CustomUserDetails;
 import com.example.animequiz.entity.User;
 import com.example.animequiz.repository.UserRepository;
+import com.example.animequiz.securityConfig.CustomUserDetailsImpl;
 import com.example.animequiz.service.ShikimoriService;
 import com.example.animequiz.service.StorageService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -14,7 +16,9 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -105,6 +109,9 @@ public class profileController {
                 User user = found.get();
                 user.setDisplayName(clean);
                 userRepository.save(user);
+
+                UsernamePasswordAuthenticationToken newAuth = getNewAuth(auth, clean);
+                SecurityContextHolder.getContext().setAuthentication(newAuth);
             }
         } else {
             Cookie cookie = new Cookie(NAME_COOKIE, clean);
@@ -115,6 +122,21 @@ public class profileController {
         }
         ra.addFlashAttribute("message", "Имя обновлено");
         return "redirect:/profile";
+    }
+
+    private static UsernamePasswordAuthenticationToken getNewAuth(Authentication auth, String clean) {
+        CustomUserDetailsImpl currentDetails = (CustomUserDetailsImpl) auth.getPrincipal();
+        CustomUserDetails updatedDetails = new CustomUserDetailsImpl(
+                currentDetails.getUsername(),
+                currentDetails.getPassword(),
+                clean,
+                currentDetails.getAuthorities()
+        );
+        return new UsernamePasswordAuthenticationToken(
+                updatedDetails,
+                auth.getCredentials(),
+                auth.getAuthorities()
+        );
     }
 
     @PostMapping("/profile/avatar")
@@ -147,7 +169,6 @@ public class profileController {
 
     @PostMapping("/profile/import")
     public String importTitles(@RequestParam String nickname, Authentication auth, RedirectAttributes ra) {
-        // доступно только авторизованным — гарантирует SecurityConfig
         try {
             ShikimoriService.ImportResult result = shikimoriService.importAnimeList(nickname);
             storageService.saveTitles(auth.getName(), result.json().getBytes(StandardCharsets.UTF_8));
@@ -159,13 +180,10 @@ public class profileController {
         return "redirect:/profile";
     }
 
-    // ----- вспомогательное ----------------------------------------------
-
     private static boolean isAuthed(Authentication a) {
         return a != null && a.isAuthenticated() && !(a instanceof AnonymousAuthenticationToken);
     }
 
-    /** Ключ хранилища: u_&lt;логин&gt; для залогиненных, g_&lt;uuid&gt; для гостей (кука). */
     private String storageKey(Authentication auth, HttpServletRequest request, HttpServletResponse response) {
         if (isAuthed(auth)) {
             return "u_" + auth.getName();

@@ -9,13 +9,17 @@ public class CustomUserDetailsImpl implements CustomUserDetails {
     private final String username;
     private final String password;
     private final String displayName;
+    private final Boolean enabled;
     private final Collection<? extends GrantedAuthority> authorities;
 
-    public CustomUserDetailsImpl(String username, String password, String displayName, Collection<? extends GrantedAuthority> authorities) {
+    public CustomUserDetailsImpl(String username, String password,
+                                 String displayName, Collection<? extends GrantedAuthority> authorities,
+                                 Boolean enabled) {
         this.username = username;
         this.password = password;
         this.displayName = displayName;
         this.authorities = authorities;
+        this.enabled = enabled;
     }
 
     @Override
@@ -45,5 +49,5 @@ public class CustomUserDetailsImpl implements CustomUserDetails {
     @Override
     public boolean isCredentialsNonExpired() { return true; }
     @Override
-    public boolean isEnabled() { return true; }
+    public boolean isEnabled() { return this.enabled; }
 }

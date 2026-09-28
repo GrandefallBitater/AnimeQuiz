@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <title>Админ-панель — AnimeQuiz</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" th:href="@{server-images/anime-logo.png}">
+    <link rel="stylesheet" th:href="@{adminPage/admin.css}">
+    <link rel="stylesheet" th:href="@{footer.css}">
+    <link rel="stylesheet" th:href="@{header.css}">
+</head>
+<body>
+
+<div th:replace="~{fragments/header :: header}"></div>
+
+<div class="global-floating-icons">
+    <span>⚔️</span><span>🌸</span><span>🎮</span><span>⭐</span>
+    <span>🔥</span><span>💫</span><span>🍥</span><span>👻</span>
+</div>
+
+<main class="admin-main">
+
+    <section class="admin-hero">
+        <div class="hero-badge">Зона администратора</div>
+    </section>
+
+    <section class="dashboard-section reveal-on-scroll">
+        <div class="container dash-grid">
+
+            <div class="dash-col">
+                <h2 class="panel-label">Текущий пользователь</h2>
+                <div class="admin-card user-summary-card">
+                    <div class="summary-top">
+                        <div id="adminAvatar" class="summary-avatar">👑</div>
+                        <div class="summary-name">
+                            <span id="adminDisplayName">Admin-sama</span>
+                            <span id="adminRoleBadge" class="role-badge role-admin">Администратор</span>
+                        </div>
+                    </div>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <span class="summary-label">Статус аккаунта</span>
+                            <span id="adminStatusField" class="status-badge status-enabled">
+                    <span class="status-dot"></span>Включён
+                </span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Уровень доступа</span>
+                            <span class="summary-value">Полный</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dash-col">
+                <h2 class="panel-label">Импорт из Шикимори</h2>
+                <div class="admin-card shikimori-card">
+                    <div class="shikimori-info">
+                        <div class="shikimori-logo" style="overflow: hidden;">
+                            <img th:src="@{/server-images/shiki.png}"
+                                 alt="Shikimori"
+                                 style="width: 100%; height: 100%; object-fit: cover;" />
+                        </div>
+                        <div>
+                            <h3>Загрузка базы аниме</h3>
+                            <p>
+                                Нажмите «Загрузить» — сервер самостоятельно обратится
+                                к API Шикимори и выполнит импорт аниме в формате JSON.
+                            </p>
+                            <div class="sync-status">
+                                <span class="sync-dot"></span>
+                                Последний импорт:&nbsp;<b id="lastSync"></b>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn-main btn-shikimori" id="shikimoriBtn" type="button">
+                        <span class="btn-icon"></span>
+                        <span class="btn-label">Загрузить</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <section class="users-section reveal-on-scroll">
+        <div class="container">
+            <h2 class="section-title">Управление <span>пользователями</span></h2>
+
+            <div class="admin-card users-panel">
+
+                <div class="users-toolbar">
+                    <div class="search-box">
+                        <span>🔍</span>
+                        <label for="userSearch"></label><input type="text" id="userSearch" placeholder="Поиск по никнейму...">
+                    </div>
+                    <div class="toolbar-right">
+                        <span class="users-count">Всего пользователей: <b id="usersCount">0</b></span>
+                        <button class="btn-main btn-small" id="createUserBtn" type="button">
+                            Создать пользователя
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="users-table">
+                        <thead>
+                        <tr>
+                            <th>Пользователь</th>
+                            <th>Роль</th>
+                            <th>Статус</th>
+                            <th class="th-actions">Действия</th>
+                        </tr>
+                        </thead>
+                        <tbody id="usersTableBody"></tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<div class="modal-overlay" id="userModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 id="userModalTitle">Создание пользователя</h3>
+            <button class="modal-close" id="closeUserModal" type="button">✕</button>
+        </div>
+
+        <form id="userForm">
+            <div class="form-group">
+                <label for="fNick">Никнейм *</label>
+                <input type="text" id="fNick" placeholder="Например: GojoSatoru">
+            </div>
+            <div class="form-group" id="passRow">
+                <label for="fPass">Пароль *</label>
+                <input type="password" id="fPass" placeholder="Минимум 6 символов">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="fRole">Роль</label>
+                    <select id="fRole">
+                        <option value="USER">Пользователь</option>
+                        <option value="ADMIN">Администратор</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="fStatus">Статус аккаунта</label>
+                    <select id="fStatus">
+                        <option value="enabled">Включён</option>
+                        <option value="disabled">Отключён</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-ghost" id="cancelUserBtn">Отмена</button>
+                <button type="submit" class="btn-main" id="submitUserBtn">Создать</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal-box modal-danger">
+        <span class="danger-icon">🗑️</span>
+        <h3>Удалить пользователя?</h3>
+        <p>Пользователь <b id="deleteUserName"></b> будет удалён без возможности восстановления.</p>
+        <div class="modal-actions modal-actions-center">
+            <button type="button" class="btn-ghost" id="cancelDeleteBtn">Отмена</button>
+            <button type="button" class="btn-danger" id="confirmDeleteBtn">Удалить</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<div th:replace="~{fragments/footer :: footer}"></div>
+
+<script type="text/javascript" th:src="@{jQuerry.js}"></script>
+<script th:src="@{adminPage/adminScript.js}"></script>
+</body>
+</html>

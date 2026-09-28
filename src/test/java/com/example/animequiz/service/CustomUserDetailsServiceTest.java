@@ -1,5 +1,6 @@
 package com.example.animequiz.service;
 
+import com.example.animequiz.Interfaces.CustomUserDetails;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,8 +21,12 @@ class CustomUserDetailsServiceTest {
 
     @Test
     void loadUserByUsernameOutputNotNull() {
-        assertAll(() -> assertNotNull(customUserDetailsService.loadUserByUsername("admin").getPassword()),
-                () -> assertNotNull(customUserDetailsService.loadUserByUsername("admin").getAuthorities()),
-                () -> assertNotNull(customUserDetailsService.loadUserByUsername("admin").getUsername()));
+        CustomUserDetails details = customUserDetailsService.loadUserByUsername("admin");
+        assertAll(
+                () -> assertNotNull(details.getPassword(), "Пароль не должен быть null"),
+                () -> assertNotNull(details.getAuthorities(), "Роли не должны быть null"),
+                () -> assertNotNull(details.getUsername(), "Имя пользователя не должно быть null"),
+                () -> assertNotNull(details.getDisplayName(), "Отображаемое имя не должно быть null")
+        );
     }
 }

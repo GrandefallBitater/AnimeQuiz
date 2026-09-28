@@ -1,39 +1,22 @@
-<div th:fragment="header" xmlns:th="http://www.thymeleaf.org"
-     xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark" style="background-color: #0d0d1a !important;">
-        <div class="container-fluid">
+<header class="site-header" xmlns:sec="http://www.w3.org/1999/xhtml">
+    <div class="header-inner">
+        <a href="/" class="logo">Anime<span>Quiz</span></a>
 
-            <a class="navbar-brand" href="/">AnimeQuiz</a>
+        <nav class="header-nav">
+            <a href="/">главная</a>
+            <a href="/admin" sec:authorize ="hasRole('ROLE_ADMIN')">Админ-панель</a>
+        </nav>
 
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <div class="collapse navbar-collapse" id="navbarContent">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link active" aria-current="page" href="#">Главная</a>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            персонализация
-                        </a>
-                        <ul class="dropdown-menu" style="background-color: #0d0d1a !important;" aria-labelledby="navbarDropdown">
-                            <li><a href="#" class="dropdown-item" style="color: white" data-bs-toggle="modal" data-bs-target="#usernameModal">задать ник</a></li>
-                            <li><a class="dropdown-item" style="color: white" href="/profile">задать аватарку</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" style="color: white" href="/profile">профиль</a></li>
-                        </ul>
-                    </li>
-                </ul>
-
-                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/login" sec:authorize ="hasRole('ROLE_ANONYMOUS')">Войти</a>
-                        <a class="nav-link active" href="/logout" sec:authorize ="isAuthenticated()">Выйти</a>
-                    </li>
-                </ul>
+        <div class="dropdown">
+            <button class="dropdown-toggle" type="button">Персонализация</button>
+            <div class="dropdown-menu">
+                <a href="#" class="dropdown-item" style="color: white" data-bs-toggle="modal" data-bs-target="#usernameModal">задать ник</a>
+                <a href="/profile">Задать аватарку</a>
+                <a href="/profile">Профиль</a>
             </div>
         </div>
-    </nav>
-</div>
+
+        <a class="btn-login" href="/login" sec:authorize ="hasRole('ROLE_ANONYMOUS')">Войти</a>
+        <a class="btn-logout" href="/logout" sec:authorize ="isAuthenticated()">Выйти</a>
+    </div>
+</header>

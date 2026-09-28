@@ -12,7 +12,6 @@ public class homeController {
 
     public homeController() {}
 
-    //todo displayed name is a "display_name"
     @GetMapping("/")
     public String showHome(Model model, Authentication authentication,
                            @CookieValue(value = "CustomUserName", defaultValue = "guest") String CustomUserName) {

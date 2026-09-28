@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -19,15 +19,14 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 
+@Slf4j
 @Service
 public class ShikimoriService {
 
-    private static final Logger log = LoggerFactory.getLogger(ShikimoriService.class);
-
     private static final int MAX_ATTEMPTS = 4;
-    private static final long RETRY_DELAY_MS = 800;
-    private static final int PAGE_LIMIT = 5000;
-    private static final int MAX_PAGES = 20;
+    private static final long RETRY_DELAY_MS = 3200;
+    private static final int PAGE_LIMIT = 50;
+    private static final int MAX_PAGES = 500;
 
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -48,15 +47,44 @@ public class ShikimoriService {
         this.userAgent = userAgent;
     }
 
-    public record ImportResult(long userId, String nickname, int count, String json) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public byte[] importSiteAnimeList() {
+        ArrayNode titles = mapper.createArrayNode();
+        for (int page = 1; page <= MAX_PAGES; page++) {
+            log.info("Обработка страницы {}", page);
+            JsonNode rates = getJson("/animes?limit=" + PAGE_LIMIT + "&page=" + page);
+            if (rates == null || !rates.isArray() || rates.isEmpty()) {
+                break;
+            }
+            for (JsonNode rate : rates) {
+                titles.add(projectTitle(rate));
+            }
+            if (rates.size() < PAGE_LIMIT) {
+                break;
+            }
+            sleep(250);
+        }
+
+        ObjectNode payload = mapper.createObjectNode();
+        payload.put("source", "shikimori.io");
+        payload.put("importedAt", Instant.now().toString());
+        payload.put("count", titles.size());
+        payload.set("titles", titles);
+
+        try {
+            return mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(payload);
+        } catch (IOException e) {
+            throw new ShikimoriException("Не удалось сериализовать список тайтлов", e);
+        }
     }
+
+    public record ImportResult(long userId, String nickname, int count, String json) {}
 
     public ImportResult importAnimeList(String nickname) {
         String clean = nickname == null ? "" : nickname.trim();
         if (clean.isEmpty()) {
             throw new IllegalArgumentException("Укажите никнейм на Shikimori");
         }
-
         JsonNode user = getJson("/users/" + enc(clean) + "?is_nickname=1");
         if (user == null || !user.hasNonNull("id")) {
             throw new ShikimoriException("Пользователь \"" + clean + "\" не найден на Shikimori");
@@ -66,6 +94,8 @@ public class ShikimoriService {
 
         ArrayNode titles = mapper.createArrayNode();
         for (int page = 1; page <= MAX_PAGES; page++) {
+            //noinspection LoggingSimilarMessage
+            log.info("Обработка страницы {}", page);
             JsonNode rates = getJson("/users/" + userId + "/anime_rates?limit=" + PAGE_LIMIT + "&page=" + page);
             if (rates == null || !rates.isArray() || rates.isEmpty()) {
                 break;
@@ -96,15 +126,19 @@ public class ShikimoriService {
     }
 
     private ObjectNode projectTitle(JsonNode rate) {
-        JsonNode anime = rate.path("anime");
+        JsonNode anime = rate.has("anime") ? rate.path("anime") : rate;
+
         String name = asTextOrNull(anime, "name");
         String russian = asTextOrNull(anime, "russian");
+
         ObjectNode t = mapper.createObjectNode();
-        t.put("rateId", rate.path("id").asLong());
-        t.put("status", asTextOrNull(rate, "status"));
-        t.put("score", rate.path("score").asInt(0));
-        t.put("episodes", rate.path("episodes").asInt(0));
-        t.put("rewatches", rate.path("rewatches").asInt(0));
+
+        t.put("rateId", rate.has("anime") ? rate.path("id").asLong() : 0L);
+        t.put("status", rate.has("anime") ? asTextOrNull(rate, "status") : null);
+        t.put("score", rate.has("anime") ? rate.path("score").asInt(0) : 0);
+        t.put("episodes", rate.has("anime") ? rate.path("episodes").asInt(0) : 0);
+        t.put("rewatches", rate.has("anime") ? rate.path("rewatches").asInt(0) : 0);
+
         t.put("animeId", anime.path("id").asLong());
         t.put("name", name);
         t.put("russian", russian);
@@ -113,7 +147,11 @@ public class ShikimoriService {
         t.put("animeStatus", asTextOrNull(anime, "status"));
         t.put("totalEpisodes", anime.path("episodes").asInt(0));
         t.put("url", absolute(asTextOrNull(anime, "url")));
-        t.put("imageUrl", absolute(anime.path("image").path("preview").asText(null)));
+
+        JsonNode imageNode = anime.path("image");
+        String previewUrl = imageNode.isMissingNode() ? null : imageNode.path("preview").asText(null);
+        t.put("imageUrl", absolute(previewUrl));
+
         return t;
     }
 

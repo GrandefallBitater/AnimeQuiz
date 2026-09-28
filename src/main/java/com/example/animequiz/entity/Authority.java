@@ -3,6 +3,7 @@ package com.example.animequiz.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Data
 @NoArgsConstructor
@@ -18,6 +19,7 @@ public class Authority implements org.springframework.security.core.GrantedAutho
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "username", nullable = false, updatable = false)
+    @ToString.Exclude
     private User user;
 
     @Column(nullable = false)

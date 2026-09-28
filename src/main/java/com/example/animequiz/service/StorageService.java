@@ -3,15 +3,13 @@ package com.example.animequiz.service;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -30,11 +28,13 @@ public class StorageService {
     private final Path root;
     private final Path avatarsDir;
     private final Path titlesDir;
+    private final Path siteTitlesDir;
 
     public StorageService(@Value("${app.storage.location}") String location) {
         this.root = Paths.get(location).toAbsolutePath().normalize();
         this.avatarsDir = root.resolve("avatars");
         this.titlesDir = root.resolve("titles");
+        this.siteTitlesDir = root.resolve("site_titles");
     }
 
     @PostConstruct
@@ -42,6 +42,7 @@ public class StorageService {
         try {
             Files.createDirectories(avatarsDir);
             Files.createDirectories(titlesDir);
+            Files.createDirectories(siteTitlesDir);
         } catch (IOException e) {
             throw new UncheckedIOException("Не удалось подготовить хранилище: " + root, e);
         }
@@ -90,7 +91,7 @@ public class StorageService {
         }
     }
 
-    private void deleteAvatar(String safe) throws IOException {
+    public void deleteAvatar(String safe) throws IOException {
         if (!Files.isDirectory(avatarsDir)) {
             return;
         }
@@ -100,7 +101,7 @@ public class StorageService {
                         try {
                             Files.deleteIfExists(p);
                         } catch (IOException e) {
-                            throw new UncheckedIOException(e);
+                            throw new UncheckedIOException("не удалось удалить аватар", e);
                         }
                     });
         }
@@ -126,6 +127,32 @@ public class StorageService {
         }
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
+    public void saveSiteAnimeList(byte[] json) {
+        Path target = siteTitlesDir.resolve("Titles.json");
+        Path tempTarget = siteTitlesDir.resolve("Titles.json.tmp");
+
+        try {
+            Files.write(tempTarget, json,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE);
+
+            Files.move(tempTarget, target,
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE);
+
+        } catch (IOException e) {
+            try {
+                Files.deleteIfExists(tempTarget);
+            } catch (IOException ignored) {
+                throw new UncheckedIOException(
+                        "Не удалось сохранить список тайтлов, старый файл сохранен, временный файл сохранён", e);
+            }
+            throw new UncheckedIOException("Не удалось сохранить список тайтлов, старый файл сохранен", e);
+        }
+    }
+
     public Optional<byte[]> readTitles(String username) {
         Path source = titlesDir.resolve("u_" + sanitizeKey(username) + ".json");
         if (!Files.isRegularFile(source)) {
@@ -137,4 +164,18 @@ public class StorageService {
             return Optional.empty();
         }
     }
+
+    public Optional<byte[]> readSiteAnimeList() {
+        Path source = siteTitlesDir.resolve("Titles.json");
+        if (!Files.isRegularFile(source)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Files.readAllBytes(source));
+        } catch (IOException e) {
+            return Optional.empty();
+        }
+    }
+
+    //TODO when importing siteAnimeList sort by name
 }

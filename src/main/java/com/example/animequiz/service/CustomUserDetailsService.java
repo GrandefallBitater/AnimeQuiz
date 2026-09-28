@@ -39,7 +39,8 @@ public class CustomUserDetailsService implements UserDetailsService {
                 user.getUsername(),
                 user.getPassword(),
                 user.getDisplayName(),
-                grantedAuthorities
+                grantedAuthorities,
+                user.isEnabled()
         );
     }
 }

@@ -72,8 +72,6 @@ public class profileController {
         }
     }
 
-    // ----- страница профиля ---------------------------------------------
-
     @GetMapping("/profile")
     public String profile(Model model, Authentication auth,
                           HttpServletRequest request, HttpServletResponse response) {
@@ -88,7 +86,6 @@ public class profileController {
                     JsonNode info = mapper.readTree(bytes);
                     model.addAttribute("titlesInfo", info);
                 } catch (Exception ignored) {
-                    // повреждённый файл списка — просто не показываем
                 }
             });
         }
@@ -124,14 +121,16 @@ public class profileController {
         return "redirect:/profile";
     }
 
+    //TODO create static object with this method
     private static UsernamePasswordAuthenticationToken getNewAuth(Authentication auth, String clean) {
         CustomUserDetailsImpl currentDetails = (CustomUserDetailsImpl) auth.getPrincipal();
         CustomUserDetails updatedDetails = new CustomUserDetailsImpl(
-                currentDetails.getUsername(),
-                currentDetails.getPassword(),
-                clean,
-                currentDetails.getAuthorities()
-        );
+                        currentDetails.getUsername(),
+                        currentDetails.getPassword(),
+                        clean,
+                        currentDetails.getAuthorities(),
+                        currentDetails.isEnabled()
+                );
         return new UsernamePasswordAuthenticationToken(
                 updatedDetails,
                 auth.getCredentials(),
@@ -154,9 +153,16 @@ public class profileController {
 
     @GetMapping("/profile/avatar")
     @ResponseBody
-    public ResponseEntity<Resource> getAvatar(Authentication auth,
+    public ResponseEntity<Resource> getAvatar(@RequestParam(value = "user", required = false) String targetUser,
+                                              Authentication auth,
                                               HttpServletRequest request, HttpServletResponse response) {
-        String key = storageKey(auth, request, response);
+        String key;
+        if (targetUser != null && !targetUser.isBlank() && isCustomAdmin(auth)) {
+            key = "u_" + targetUser;
+        } else {
+            key = storageKey(auth, request, response);
+        }
+
         Optional<Path> avatar = storageService.findAvatar(key);
         if (avatar.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -165,6 +171,12 @@ public class profileController {
         return ResponseEntity.ok()
                 .contentType(StorageService.mediaTypeFor(file))
                 .body(new FileSystemResource(file));
+    }
+
+    //TODO create static object with this method
+    private static boolean isCustomAdmin(Authentication a) {
+        return a != null && a.getAuthorities().stream()
+                .anyMatch(auth -> "ROLE_ADMIN".equals(auth.getAuthority()));
     }
 
     @PostMapping("/profile/import")
@@ -180,6 +192,7 @@ public class profileController {
         return "redirect:/profile";
     }
 
+    //TODO create static object with this method
     private static boolean isAuthed(Authentication a) {
         return a != null && a.isAuthenticated() && !(a instanceof AnonymousAuthenticationToken);
     }
@@ -222,4 +235,7 @@ public class profileController {
         }
         return null;
     }
+
+    //TODO create import anime list from YammyAnime
+    //TODO create import anime list from MAL
 }

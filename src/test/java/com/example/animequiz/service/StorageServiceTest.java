@@ -1,90 +1,203 @@
 package com.example.animequiz.service;
 
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest
-class StorageServiceIntegrationTest {
-
-    @Autowired
-    private StorageService storageService;
+class StorageServiceTest {
 
     @TempDir
-    static Path tempStorageLocation;
+    Path tempDir;
 
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("app.storage.location", () -> tempStorageLocation.toAbsolutePath().toString());
-    }
+    private StorageService storage;
+    private Path root;
 
-    @AfterEach
-    void cleanUp() throws IOException {
-        Path avatarsDir = tempStorageLocation.resolve("avatars");
-        if (Files.exists(avatarsDir)) {
-            try (var stream = Files.list(avatarsDir)) {
-                stream.forEach(p -> {
-                    try {
-                        Files.delete(p);
-                    } catch (IOException ignored) {
-                    }
-                });
-            }
-        }
-        Path titlesDir = tempStorageLocation.resolve("titles");
-        if (Files.exists(titlesDir)) {
-            try (var stream = Files.list(titlesDir)) {
-                stream.forEach(p -> {
-                    try {
-                        Files.delete(p);
-                    } catch (IOException ignored) {
-                    }
-                });
-            }
-        }
+    @BeforeEach
+    void setUp() {
+        root = tempDir.resolve("storage");
+        storage = new StorageService(root.toString());
+        storage.init(); // ручная замена @PostConstruct
     }
 
     @Test
-    void shouldInitializeSaveAndReadCorrectly() {
-        Path expectedAvatarsDir = tempStorageLocation.resolve("avatars");
-        Path expectedTitlesDir = tempStorageLocation.resolve("titles");
+    void initCreatesAllDirectories() {
+        assertThat(Files.isDirectory(root.resolve("avatars"))).isTrue();
+        assertThat(Files.isDirectory(root.resolve("titles"))).isTrue();
+        assertThat(Files.isDirectory(root.resolve("site_titles"))).isTrue();
+    }
 
-        assertThat(expectedAvatarsDir).isDirectory();
-        assertThat(expectedTitlesDir).isDirectory();
+    @Test
+    void sanitizeKeyRejectsNull() {
+        assertThatThrownBy(() -> StorageService.sanitizeKey(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Пустой ключ");
+    }
 
-        MockMultipartFile file = new MockMultipartFile(
-                "file", "integration-test.webp", "image/webp", "fake-webp-bytes".getBytes()
-        );
+    @Test
+    void sanitizeKeyRejectsEmptyString() {
+        assertThatThrownBy(() -> StorageService.sanitizeKey(""))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 
-        String savedFileName = storageService.saveAvatar("shikimori-user", file);
-        assertThat(savedFileName).isEqualTo("shikimori-user.webp");
+    @Test
+    void sanitizeKeyReplacesForbiddenCharacters() {
+        assertThat(StorageService.sanitizeKey("user name@doe!")).isEqualTo("user_name_doe_");
+        assertThat(StorageService.sanitizeKey("abc-123_XYZ")).isEqualTo("abc-123_XYZ");
+        assertThat(StorageService.sanitizeKey("привет")).isEqualTo("______"); // кириллица -> "_"
+    }
 
-        Optional<Path> foundAvatar = storageService.findAvatar("shikimori-user");
-        assertThat(foundAvatar).isPresent();
-        assertThat(foundAvatar.get()).exists();
+    @Test
+    void saveAvatarStoresFileAndReturnsFileName() {
+        MockMultipartFile file = new MockMultipartFile("f", "a.png", "image/png", new byte[]{1, 2, 3});
 
-        String username = "naruto_kun";
-        byte[] rawJson = "{\"status\":\"completed\",\"count\":42}".getBytes(StandardCharsets.UTF_8);
+        String saved = storage.saveAvatar("user1", file);
 
-        storageService.saveTitles(username, rawJson);
+        assertThat(saved).isEqualTo("user1.png");
+        assertThat(Files.exists(root.resolve("avatars/user1.png"))).isTrue();
+    }
 
-        Optional<byte[]> savedJsonBytes = storageService.readTitles(username);
-        assertThat(savedJsonBytes).isPresent();
+    @Test
+    void saveAvatarSanitizesKey() {
+        MockMultipartFile file = new MockMultipartFile("f", "a.png", "image/png", new byte[]{1});
 
-        String resultJson = new String(savedJsonBytes.get(), StandardCharsets.UTF_8);
-        assertThat(resultJson).contains("completed").contains("42");
+        String saved = storage.saveAvatar("bad key!", file);
+
+        assertThat(saved).isEqualTo("bad_key_.png");
+    }
+
+    @Test
+    void saveAvatarMapsContentTypeToExtension() {
+        assertThat(storage.saveAvatar("u1",
+                new MockMultipartFile("f", "a.jpeg", "image/jpeg", new byte[]{1}))).isEqualTo("u1.jpg");
+        assertThat(storage.saveAvatar("u2",
+                new MockMultipartFile("f", "a.webp", "image/webp", new byte[]{1}))).isEqualTo("u2.webp");
+        assertThat(storage.saveAvatar("u3",
+                new MockMultipartFile("f", "a.gif", "image/gif", new byte[]{1}))).isEqualTo("u3.gif");
+    }
+
+    @Test
+    void saveAvatarRejectsNullFile() {
+        assertThatThrownBy(() -> storage.saveAvatar("u", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Файл не выбран");
+    }
+
+    @Test
+    void saveAvatarRejectsEmptyFile() {
+        MockMultipartFile empty = new MockMultipartFile("f", "a.png", "image/png", new byte[0]);
+
+        assertThatThrownBy(() -> storage.saveAvatar("u", empty))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Файл не выбран");
+    }
+
+    @Test
+    void saveAvatarRejectsTooLargeFile() {
+        byte[] tooBig = new byte[5 * 1024 * 1024 + 1]; // 5 МБ + 1 байт
+        MockMultipartFile file = new MockMultipartFile("f", "a.png", "image/png", tooBig);
+
+        assertThatThrownBy(() -> storage.saveAvatar("u", file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("5 МБ");
+    }
+
+    @Test
+    void saveAvatarRejectsUnsupportedContentType() {
+        MockMultipartFile file = new MockMultipartFile("f", "a.txt", "text/plain", new byte[]{1});
+
+        assertThatThrownBy(() -> storage.saveAvatar("u", file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Недопустимый формат");
+    }
+
+    @Test
+    void saveAvatarReplacesPreviousFileWithSameKey() {
+        storage.saveAvatar("user1", new MockMultipartFile("f", "a.png", "image/png", new byte[]{1}));
+        storage.saveAvatar("user1", new MockMultipartFile("f", "a.jpg", "image/jpeg", new byte[]{2}));
+
+        assertThat(Files.exists(root.resolve("avatars/user1.png"))).isFalse();
+        assertThat(Files.exists(root.resolve("avatars/user1.jpg"))).isTrue();
+    }
+
+    @Test
+    void findAvatarReturnsStoredFile() {
+        storage.saveAvatar("user1", new MockMultipartFile("f", "a.gif", "image/gif", new byte[]{1}));
+
+        assertThat(storage.findAvatar("user1"))
+                .isPresent()
+                .hasValueSatisfying(p -> assertThat(p.getFileName().toString()).isEqualTo("user1.gif"));
+    }
+
+    @Test
+    void findAvatarReturnsEmptyForUnknownKey() {
+        assertThat(storage.findAvatar("ghost")).isEmpty();
+    }
+
+    @Test
+    void deleteAvatarRemovesFile() throws IOException {
+        storage.saveAvatar("user1", new MockMultipartFile("f", "a.png", "image/png", new byte[]{1}));
+
+        storage.deleteAvatar("user1");
+
+        assertThat(storage.findAvatar("user1")).isEmpty();
+    }
+
+    @Test
+    void mediaTypeForDetectsExtension() {
+        assertThat(StorageService.mediaTypeFor(Path.of("x.png"))).isEqualTo(MediaType.IMAGE_PNG);
+        assertThat(StorageService.mediaTypeFor(Path.of("x.gif"))).isEqualTo(MediaType.IMAGE_GIF);
+        assertThat(StorageService.mediaTypeFor(Path.of("x.webp")))
+                .isEqualTo(MediaType.parseMediaType("image/webp"));
+        assertThat(StorageService.mediaTypeFor(Path.of("x.jpg"))).isEqualTo(MediaType.IMAGE_JPEG);
+        assertThat(StorageService.mediaTypeFor(Path.of("x.unknown"))).isEqualTo(MediaType.IMAGE_JPEG);
+    }
+
+    @Test
+    void saveAndReadTitlesRoundTrip() {
+        byte[] json = "{\"titles\":[]}".getBytes(StandardCharsets.UTF_8);
+
+        storage.saveTitles("user one", json);
+
+        assertThat(Files.exists(root.resolve("titles/u_user_one.json"))).isTrue();
+        assertThat(storage.readTitles("user one")).contains(json);
+    }
+
+    @Test
+    void saveTitlesOverwritesPreviousContent() {
+        storage.saveTitles("u1", "old".getBytes(StandardCharsets.UTF_8));
+        storage.saveTitles("u1", "new".getBytes(StandardCharsets.UTF_8));
+
+        assertThat(storage.readTitles("u1"))
+                .contains("new".getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void readTitlesReturnsEmptyWhenNoFile() {
+        assertThat(storage.readTitles("nobody")).isEmpty();
+    }
+
+    @Test
+    void saveAndReadSiteAnimeListRoundTripLeavesNoTempFile() {
+        byte[] json = "{\"titles\":[]}".getBytes(StandardCharsets.UTF_8);
+
+        storage.saveSiteAnimeList(json);
+
+        assertThat(storage.readSiteAnimeList()).contains(json);
+        assertThat(Files.exists(root.resolve("site_titles/Titles.json.tmp"))).isFalse();
+    }
+
+    @Test
+    void readSiteAnimeListReturnsEmptyWhenNoFile() {
+        assertThat(storage.readSiteAnimeList()).isEmpty();
     }
 }

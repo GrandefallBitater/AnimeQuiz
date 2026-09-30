@@ -3,6 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
     <title>AnimeQuiz</title>
 
     <link rel="icon" type="image/png" th:href="@{server-images/anime-logo.png}">
@@ -16,20 +18,16 @@
     <link rel="stylesheet" th:href="@{homePage/home.css}">
     <link rel="stylesheet" th:href="@{footer.css}">
     <link rel="stylesheet" th:href="@{header.css}">
+    <link rel="stylesheet" th:href="@{modal.css}">
+    <link rel="stylesheet" th:href="@{floating_icons.css}">
 </head>
 <body class="d-flex flex-column min-vh-100">
 
 <div th:replace="~{fragments/header :: header}"></div>
 
 <div class="global-floating-icons">
-    <span>⚔️</span>
-    <span>🌸</span>
-    <span>🎮</span>
-    <span>⭐</span>
-    <span>🔥</span>
-    <span>💫</span>
-    <span>🍥</span>
-    <span>👻</span>
+    <span>⚔️</span><span>🌸</span><span>🎮</span><span>⭐</span>
+    <span>🔥</span><span>💫</span><span>🍥</span><span>👻</span>
 </div>
 
 <div class="user-section">
@@ -343,6 +341,7 @@
 
 <script type="text/javascript" th:src="@{jQuerry.js}"></script>
 <script type="text/javascript" th:src="@{homePage/homeScript.js}"></script>
-
+<script th:src="@{toast.js}"></script>
+<script th:src="@{/auth/logout.js}"></script>
 </body>
 </html>

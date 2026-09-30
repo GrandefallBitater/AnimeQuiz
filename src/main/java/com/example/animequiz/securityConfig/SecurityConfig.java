@@ -36,22 +36,34 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.ALWAYS)
                         .maximumSessions(-1)
                         .sessionRegistry(sessionRegistry())
-                        .expiredUrl("/login?error")
+                        .expiredUrl("/login?error=session")
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/login", "/register", "/auth/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/profile/import").authenticated()
                         .anyRequest().permitAll()
                 )
                 .formLogin(form -> form
-                        .defaultSuccessUrl("/", true))
-                .logout((logout) -> logout.logoutSuccessUrl("/"));
+                        .loginPage("/login")
+                        .loginProcessingUrl("/login")
+                        .defaultSuccessUrl("/", true)
+                        .failureUrl("/login?error=credentials")
+                        .permitAll()
+                )
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("/login?logout")
+                        .invalidateHttpSession(true)
+                        .deleteCookies("JSESSIONID")
+                );
 
         return http.build();
     }
 
     @Bean
-    public UserDetailsService userDetailsService(UserRepository userRepository, AuthoritiesRepository authoritiesRepository) {
+    public UserDetailsService userDetailsService(UserRepository userRepository,
+                                                 AuthoritiesRepository authoritiesRepository) {
         return new CustomUserDetailsService(userRepository, authoritiesRepository);
     }
 

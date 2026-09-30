@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход — AnimeQuiz</title>
+    <link rel="stylesheet" th:href="@{/auth/auth.css}">
+    <link rel="stylesheet" th:href="@{floating_icons.css}">
+</head>
+<body>
+
+<div class="global-floating-icons">
+    <span>⚔️</span>
+    <span>🌸</span>
+    <span>🎮</span>
+    <span>⭐</span>
+    <span>🔥</span>
+    <span>💫</span>
+    <span>🍥</span>
+    <span>👻</span>
+</div>
+
+<div class="auth-card">
+    <div class="auth-header">
+        <div class="auth-logo">🎮</div>
+        <h1 class="auth-title">С возвращением!</h1>
+        <p class="auth-subtitle">Войдите, чтобы продолжить приключение</p>
+    </div>
+
+    <div th:if="${errorMessage}" class="auth-alert auth-alert-error" id="errorAlert">
+        <span></span>
+        <span th:text="${errorMessage}">Ошибка</span>
+    </div>
+
+    <div th:if="${infoMessage}" class="auth-alert auth-alert-info" id="infoAlert">
+        <span></span>
+        <span th:text="${infoMessage}">Сообщение</span>
+    </div>
+
+    <div th:if="${param.logout}" class="auth-alert auth-alert-success">
+        <span>Вы успешно вышли из аккаунта!</span>
+    </div>
+
+    <form id="loginForm" th:action="@{/login}" method="post">
+        <div class="form-group">
+            <label for="username">Никнейм</label>
+            <span class="form-input-icon">👤</span>
+            <input type="text"
+                   id="username"
+                   name="username"
+                   class="form-input"
+                   placeholder="Введите никнейм"
+                   required
+                   autocomplete="username">
+        </div>
+
+        <div class="form-group">
+            <label for="password">Пароль</label>
+            <span class="form-input-icon">🔒</span>
+            <input type="password"
+                   id="password"
+                   name="password"
+                   class="form-input"
+                   placeholder="Введите пароль"
+                   required
+                   autocomplete="current-password">
+        </div>
+
+        <button type="submit" class="btn-auth" id="loginBtn">
+            <span>Войти</span>
+            <span>→</span>
+        </button>
+    </form>
+
+    <div class="auth-switch">
+        Нет аккаунта? <a th:href="@{/register}">Создать аккаунт</a>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script th:src="@{/auth/authScript.js}"></script>
+</body>
+</html>

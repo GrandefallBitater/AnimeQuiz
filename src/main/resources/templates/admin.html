@@ -10,7 +10,10 @@
     <link rel="icon" type="image/png" th:href="@{server-images/anime-logo.png}">
     <link rel="stylesheet" th:href="@{adminPage/admin.css}">
     <link rel="stylesheet" th:href="@{footer.css}">
+    <link rel="stylesheet" th:href="@{modal.css}">
     <link rel="stylesheet" th:href="@{header.css}">
+    <link rel="stylesheet" th:href="@{modal.css}">
+    <link rel="stylesheet" th:href="@{floating_icons.css}">
 </head>
 <body>
 
@@ -135,7 +138,7 @@
         <form id="userForm">
             <div class="form-group">
                 <label for="fNick">Никнейм *</label>
-                <input type="text" id="fNick" placeholder="Например: GojoSatoru">
+                <input type="text" id="fNick" placeholder="Например: DojoSatoru">
             </div>
             <div class="form-group" id="passRow">
                 <label for="fPass">Пароль *</label>
@@ -169,7 +172,7 @@
     <div class="modal-box modal-danger">
         <span class="danger-icon">🗑️</span>
         <h3>Удалить пользователя?</h3>
-        <p>Пользователь <b id="deleteUserName"></b> будет удалён без возможности восстановления.</p>
+        <p>Пользователь<b id="deleteUserName"></b> будет удалён без возможности восстановления.</p>
         <div class="modal-actions modal-actions-center">
             <button type="button" class="btn-ghost" id="cancelDeleteBtn">Отмена</button>
             <button type="button" class="btn-danger" id="confirmDeleteBtn">Удалить</button>
@@ -182,6 +185,8 @@
 <div th:replace="~{fragments/footer :: footer}"></div>
 
 <script type="text/javascript" th:src="@{jQuerry.js}"></script>
+<script th:src="@{toast.js}"></script>
+<script th:src="@{/auth/logout.js}"></script>
 <script th:src="@{adminPage/adminScript.js}"></script>
 </body>
 </html>

@@ -1,0 +1,119 @@
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 5, 15, 0.75);
+    backdrop-filter: blur(6px);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.modal-overlay.open {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.modal-box {
+    width: 100%;
+    max-width: 420px;
+    background: linear-gradient(145deg, #1a1a3e, #0d0d1a);
+    border: 1px solid rgba(124, 58, 237, 0.35);
+    border-radius: 22px;
+    padding: 2.25rem;
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(124, 58, 237, 0.15);
+    transform: translateY(30px) scale(0.96);
+    transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    text-align: center;
+    box-sizing: border-box;
+    font-family: 'Poppins', sans-serif;
+}
+
+.modal-overlay.open .modal-box {
+    transform: translateY(0) scale(1) !important;
+}
+
+.modal-icon { font-size: 3rem; margin-bottom: 1rem; display: block; }
+.modal-box h3 { color: #fff; font-size: 1.35rem; margin-bottom: 0.75rem; font-weight: 700; }
+.modal-box p { color: #8888aa; line-height: 1.7; margin-bottom: 1.5rem; font-size: 0.95rem; }
+.modal-actions { display: flex; gap: 1rem; justify-content: center; }
+
+.modal-actions .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 0.85rem 1.8rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    border-radius: 60px;
+    cursor: pointer;
+    background: transparent;
+    color: #b0b0cc;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    transition: all 0.35s ease;
+    text-decoration: none;
+}
+.modal-actions .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.modal-actions .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 0.85rem 1.8rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    border-radius: 60px;
+    border: none;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(135deg, #ef4444, #ff6b9d);
+    box-shadow: 0 4px 25px rgba(239, 68, 68, 0.35);
+    transition: all 0.35s ease;
+    text-decoration: none;
+}
+.modal-actions .btn-danger:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 35px rgba(239, 68, 68, 0.5);
+}
+
+.btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 0.95rem 2rem;
+    font-size: 1rem;
+    font-weight: 700;
+    font-family: 'Poppins', sans-serif;
+    border-radius: 60px;
+    cursor: pointer;
+    background: transparent !important; /* Принудительно убираем серый фон браузера */
+    color: #ff6b9d;
+    border: 2px solid rgba(255, 107, 157, 0.4);
+    transition: all 0.35s ease;
+    white-space: nowrap;
+    text-decoration: none;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.btn-ghost:hover {
+    background: rgba(255, 107, 157, 0.1) !important;
+    border-color: #ff6b9d;
+    box-shadow: 0 8px 30px rgba(255, 107, 157, 0.25);
+    transform: translateY(-3px);
+}
+
+.btn-small {
+    padding: 0.65rem 1.5rem !important;
+    font-size: 0.95rem !important;
+}

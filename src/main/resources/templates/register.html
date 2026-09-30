@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация — AnimeQuiz</title>
+    <link rel="stylesheet" th:href="@{/auth/auth.css}">
+    <link rel="stylesheet" th:href="@{floating_icons.css}">
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+</head>
+<body>
+
+<div class="global-floating-icons">
+    <span>⚔️</span><span>🌸</span><span>🎮</span><span>⭐</span>
+    <span>🔥</span><span>💫</span><span>🍥</span><span>👻</span>
+</div>
+
+<div class="auth-card">
+    <div class="auth-header">
+        <div class="auth-logo">✨</div>
+        <h1 class="auth-title">Создание аккаунта</h1>
+        <p class="auth-subtitle">Присоединяйтесь к миру аниме-квизов</p>
+    </div>
+
+    <div th:if="${infoMessage}" class="auth-alert auth-alert-info">
+        <span>💬</span>
+        <span th:text="${infoMessage}">Сообщение</span>
+    </div>
+
+    <form id="registerForm">
+        <div class="form-group">
+            <label for="regUsername">Никнейм</label>
+            <span class="form-input-icon">👤</span>
+            <input type="text"
+                   id="regUsername"
+                   class="form-input"
+                   placeholder="Придумайте никнейм"
+                   required
+                   autocomplete="username">
+        </div>
+
+        <div class="form-group">
+            <label for="regPassword">Пароль</label>
+            <span class="form-input-icon">🔒</span>
+            <input type="password"
+                   id="regPassword"
+                   class="form-input"
+                   placeholder="Минимум 6 символов"
+                   required
+                   autocomplete="new-password">
+        </div>
+
+        <div class="form-group">
+            <label for="regPasswordConfirm">Подтвердите пароль</label>
+            <span class="form-input-icon">🔐</span>
+            <input type="password"
+                   id="regPasswordConfirm"
+                   class="form-input"
+                   placeholder="Повторите пароль"
+                   required
+                   autocomplete="new-password">
+        </div>
+
+        <button type="submit" class="btn-auth" id="registerBtn">
+            <span>Создать аккаунт</span>
+            <span>✨</span>
+        </button>
+    </form>
+
+    <div class="auth-switch">
+        Уже есть аккаунт? <a th:href="@{/login}">Войти</a>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script th:src="@{/auth/authScript.js}"></script>
+</body>
+</html>

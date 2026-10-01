@@ -52,11 +52,8 @@ body {
     height: 70px;
     margin: 0 auto 1.25rem;
     border-radius: 50%;
-    background: linear-gradient(135deg, #7c3aed, #ff6b9d);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2rem;
+    /*noinspection CssUnknownTarget*/
+    background: url('/server-images/anime-logo.png') center/cover no-repeat;
     border: 3px solid rgba(255, 255, 255, 0.12);
     box-shadow: 0 0 45px rgba(124, 58, 237, 0.45);
     animation: glowPulsePurple 3s ease-in-out infinite;
@@ -138,7 +135,6 @@ body {
     border: 1px solid rgba(124, 58, 237, 0.25);
     border-radius: 12px;
     padding: 0.9rem 1.2rem;
-    padding-left: 2.8rem;
     color: #e0e0e0;
     font-family: inherit;
     font-size: 0.95rem;

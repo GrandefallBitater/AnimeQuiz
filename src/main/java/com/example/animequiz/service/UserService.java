@@ -4,11 +4,8 @@ import com.example.animequiz.controller.UserController;
 import com.example.animequiz.entity.Authority;
 import com.example.animequiz.entity.User;
 import com.example.animequiz.repository.UserRepository;
-import com.example.animequiz.securityConfig.CustomUserDetailsImpl;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.session.SessionInformation;
-import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,16 +21,16 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
     private final StorageService storageService;
-    private final SessionRegistry sessionRegistry;
+    private final SessionService sessionService;
 
     @Autowired
     public UserService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder, StorageService storageService,
-                       SessionRegistry sessionRegistry) {
+                       SessionService sessionService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.storageService = storageService;
-        this.sessionRegistry = sessionRegistry;
+        this.sessionService = sessionService;
     }
 
     public List<User> getUsers() {
@@ -105,7 +102,7 @@ public class UserService {
             user.getAuthorities().add(authority);
 
             //TODO this line expire session when we change role, but must expire when we change user details
-            expireUserSessions(userDto.username());
+            sessionService.expireUserSessions(userDto.username());
         }
 
         return "Пользователь обновлён";
@@ -116,21 +113,6 @@ public class UserService {
              return userRepository.findById(username);
         }catch (Exception e) {
             return Optional.empty();
-        }
-    }
-
-    private void expireUserSessions(String username) {
-        List<Object> allPrincipals = sessionRegistry.getAllPrincipals();
-
-        for (Object principal : allPrincipals) {
-            if (principal instanceof CustomUserDetailsImpl userDetails) {
-                if (userDetails.getUsername().equals(username)) {
-                    List<SessionInformation> sessions = sessionRegistry.getAllSessions(principal, false);
-                    for (SessionInformation session : sessions) {
-                        session.expireNow();
-                    }
-                }
-            }
         }
     }
 }

@@ -2,20 +2,20 @@ package com.example.animequiz.controller;
 
 import com.example.animequiz.entity.User;
 import com.example.animequiz.entity.UserDto;
+import com.example.animequiz.service.AuthService;
 import com.example.animequiz.service.StorageService;
 import com.example.animequiz.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Controller
@@ -23,11 +23,14 @@ public class UserController {
 
     private final UserService userService;
     private final StorageService storageService;
+    private final AuthService authService;
 
     @Autowired
-    public UserController(UserService userService, StorageService storageService) {
+    public UserController(UserService userService, StorageService storageService,
+                          AuthService authService) {
         this.userService = userService;
         this.storageService = storageService;
+        this.authService = authService;
     }
 
     @ResponseBody
@@ -132,7 +135,8 @@ public class UserController {
     @PostMapping("/editUser")
     @PreAuthorize("hasRole('ADMIN') or authentication.name == #userDto.username")
     public Map<String, Object> editUser(@RequestBody UserRequest userDto,
-                                        Authentication currentAuth) {
+                                        Authentication currentAuth,
+                                        HttpServletRequest request) {
         String message;
         boolean isSelfUpdate = false;
 
@@ -142,25 +146,11 @@ public class UserController {
             if (currentAuth != null && currentAuth.getName().equals(userDto.username())) {
                 isSelfUpdate = true;
 
-                Optional<User> updatedUser = userService.getUser(userDto.username());
-                if (updatedUser.isPresent()) {
-                    User user = updatedUser.get();
-                    com.example.animequiz.securityConfig.CustomUserDetailsImpl userDetails =
-                            new com.example.animequiz.securityConfig.CustomUserDetailsImpl(
-                                    user.getUsername(),
-                                    user.getPassword(),
-                                    user.getDisplayName(),
-                                    user.getAuthorities(),
-                                    user.isEnabled()
-                            );
-
-                    UsernamePasswordAuthenticationToken newAuth = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            currentAuth.getCredentials(),
-                            user.getAuthorities()
-                    );
-                    SecurityContextHolder.getContext().setAuthentication(newAuth);
-                }
+                userService.getUser(userDto.username()).ifPresent(user -> {
+                    UsernamePasswordAuthenticationToken newAuth =
+                            authService.refreshAuthentication(currentAuth, user);
+                    authService.updateSecurityContext(newAuth, request);
+                });
             }
         } catch (Exception e) {
             return Map.of("message", "Ошибка при обновлении: " + e.getMessage(), "success", false);

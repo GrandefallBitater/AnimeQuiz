@@ -88,8 +88,6 @@ $(document).ready(function () {
             });
     });
 
-    //TODO create setAvatarModal
-
     const setAvatarModalHtml = `
 <div class="modal-overlay" id="setAvatarModal">
     <div class="modal-box modal-centered">

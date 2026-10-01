@@ -1,9 +1,8 @@
 package com.example.animequiz.controller;
 
-import com.example.animequiz.Interfaces.CustomUserDetails;
 import com.example.animequiz.entity.User;
 import com.example.animequiz.repository.UserRepository;
-import com.example.animequiz.securityConfig.CustomUserDetailsImpl;
+import com.example.animequiz.service.AuthService;
 import com.example.animequiz.service.ShikimoriService;
 import com.example.animequiz.service.StorageService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -16,10 +15,8 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,14 +43,17 @@ public class profileController {
     private final StorageService storageService;
     private final ShikimoriService shikimoriService;
     private final ObjectMapper mapper = new ObjectMapper();
+    private final AuthService authService;
 
     @Autowired
     public profileController(UserRepository userRepository,
                              StorageService storageService,
-                             ShikimoriService shikimoriService) {
+                             ShikimoriService shikimoriService,
+                             AuthService authService) {
         this.userRepository = userRepository;
         this.storageService = storageService;
         this.shikimoriService = shikimoriService;
+        this.authService = authService;
     }
 
     @PostMapping("/setCustomName")
@@ -77,10 +77,10 @@ public class profileController {
                           HttpServletRequest request, HttpServletResponse response) {
         String key = storageKey(auth, request, response);
         model.addAttribute("displayName", displayName(auth, request));
-        model.addAttribute("authenticated", isAuthed(auth));
+        model.addAttribute("authenticated", AuthService.isAuthenticated(auth));
         model.addAttribute("hasAvatar", storageService.findAvatar(key).isPresent());
 
-        if (isAuthed(auth)) {
+        if (AuthService.isAuthenticated(auth)) {
             storageService.readTitles(auth.getName()).ifPresent(bytes -> {
                 try {
                     JsonNode info = mapper.readTree(bytes);
@@ -105,28 +105,23 @@ public class profileController {
         return "redirect:/profile";
     }
 
-    private String executeNameUpdate(String userName, Authentication auth, HttpServletResponse response, HttpServletRequest request) {
+    private String executeNameUpdate(String userName, Authentication auth,
+                                     HttpServletResponse response, HttpServletRequest request) {
         String clean = userName == null ? "" : userName.trim();
         if (clean.isEmpty()) {
             return "Имя не может быть пустым";
         }
 
-        if (isAuthed(auth)) {
+        if (AuthService.isAuthenticated(auth)) {
             Optional<User> found = userRepository.findByUsername(auth.getName());
             if (found.isPresent()) {
                 User user = found.get();
                 user.setDisplayName(clean);
                 userRepository.save(user);
 
-                UsernamePasswordAuthenticationToken newAuth = getNewAuth(auth, clean);
-                SecurityContextHolder.getContext().setAuthentication(newAuth);
-                jakarta.servlet.http.HttpSession session = request.getSession(false);
-                if (session != null) {
-                    session.setAttribute(
-                            org.springframework.security.web.context.HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                            SecurityContextHolder.getContext()
-                    );
-                }
+                UsernamePasswordAuthenticationToken newAuth =
+                        authService.refreshAuthentication(auth, user);
+                authService.updateSecurityContext(newAuth, request);
             }
         } else {
             Cookie cookie = new Cookie(NAME_COOKIE, clean);
@@ -136,23 +131,6 @@ public class profileController {
             response.addCookie(cookie);
         }
         return "success";
-    }
-
-    //TODO create static object with this method
-    private static UsernamePasswordAuthenticationToken getNewAuth(Authentication auth, String clean) {
-        CustomUserDetailsImpl currentDetails = (CustomUserDetailsImpl) auth.getPrincipal();
-        CustomUserDetails updatedDetails = new CustomUserDetailsImpl(
-                        currentDetails.getUsername(),
-                        currentDetails.getPassword(),
-                        clean,
-                        currentDetails.getAuthorities(),
-                        currentDetails.isEnabled()
-                );
-        return new UsernamePasswordAuthenticationToken(
-                updatedDetails,
-                auth.getCredentials(),
-                auth.getAuthorities()
-        );
     }
 
     @PostMapping("/profile/avatar")
@@ -174,7 +152,7 @@ public class profileController {
                                               Authentication auth,
                                               HttpServletRequest request, HttpServletResponse response) {
         String key;
-        if (targetUser != null && !targetUser.isBlank() && isCustomAdmin(auth)) {
+        if (targetUser != null && !targetUser.isBlank() && AuthService.isAdmin(auth)) {
             key = "u_" + targetUser;
         } else {
             key = storageKey(auth, request, response);
@@ -206,12 +184,6 @@ public class profileController {
         }
     }
 
-    //TODO create static object with this method
-    private static boolean isCustomAdmin(Authentication a) {
-        return a != null && a.getAuthorities().stream()
-                .anyMatch(auth -> "ROLE_ADMIN".equals(auth.getAuthority()));
-    }
-
     @PostMapping("/profile/import")
     public String importTitles(@RequestParam String nickname, Authentication auth, RedirectAttributes ra) {
         try {
@@ -225,13 +197,8 @@ public class profileController {
         return "redirect:/profile";
     }
 
-    //TODO create static object with this method
-    private static boolean isAuthed(Authentication a) {
-        return a != null && a.isAuthenticated() && !(a instanceof AnonymousAuthenticationToken);
-    }
-
     private String storageKey(Authentication auth, HttpServletRequest request, HttpServletResponse response) {
-        if (isAuthed(auth)) {
+        if (AuthService.isAuthenticated(auth)) {
             return "u_" + auth.getName();
         }
         String guestId = readCookie(request, GUEST_COOKIE);
@@ -247,7 +214,7 @@ public class profileController {
     }
 
     private String displayName(Authentication auth, HttpServletRequest request) {
-        if (isAuthed(auth)) {
+        if (AuthService.isAuthenticated(auth)) {
             return userRepository.findByUsername(auth.getName())
                     .map(u -> (u.getDisplayName() != null && !u.getDisplayName().isBlank())
                             ? u.getDisplayName() : u.getUsername())

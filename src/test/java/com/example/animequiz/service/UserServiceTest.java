@@ -4,7 +4,6 @@ import com.example.animequiz.controller.UserController;
 import com.example.animequiz.entity.Authority;
 import com.example.animequiz.entity.User;
 import com.example.animequiz.repository.UserRepository;
-import com.example.animequiz.securityConfig.CustomUserDetailsImpl;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,8 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.core.session.SessionInformation;
-import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.ArrayList;
@@ -23,10 +20,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -43,13 +38,13 @@ class UserServiceTest {
     @Mock
     private StorageService storageService;
     @Mock
-    private SessionRegistry sessionRegistry;
+    private SessionService sessionService;
 
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, passwordEncoder, storageService, sessionRegistry);
+        userService = new UserService(userRepository, passwordEncoder, storageService, sessionService);
     }
 
     private UserController.UserRequest request(String username, String displayName,
@@ -146,7 +141,7 @@ class UserServiceTest {
         assertThat(existing.getAuthorities())
                 .extracting(Authority::getAuthority)
                 .containsExactly("ROLE_USER");
-        verifyNoInteractions(sessionRegistry);
+        verifyNoInteractions(sessionService);
     }
 
     @Test
@@ -154,32 +149,21 @@ class UserServiceTest {
         User existing = userWithRole("john", "ROLE_USER");
         when(userRepository.findById("john")).thenReturn(Optional.of(existing));
 
-        CustomUserDetailsImpl principal = mock(CustomUserDetailsImpl.class);
-        when(principal.getUsername()).thenReturn("john");
-        SessionInformation session = mock(SessionInformation.class);
-        when(sessionRegistry.getAllPrincipals()).thenReturn(List.of(principal));
-        when(sessionRegistry.getAllSessions(principal, false)).thenReturn(List.of(session));
-
         userService.updateUser(request("john", "John", null, "ADMIN", true));
 
         assertThat(existing.getAuthorities())
                 .extracting(Authority::getAuthority)
                 .containsExactly("ROLE_ADMIN"); // старые роли зачищены
-        verify(session).expireNow();
+        verify(sessionService).expireUserSessions("john");
     }
 
     @Test
     void updateUserDoesNotExpireSessionsOfOtherUsers() {
         User existing = userWithRole("john", "ROLE_USER");
         when(userRepository.findById("john")).thenReturn(Optional.of(existing));
+        userService.updateUser(request("john", "John", null, "USER", true));
 
-        CustomUserDetailsImpl otherUserPrincipal = mock(CustomUserDetailsImpl.class);
-        when(otherUserPrincipal.getUsername()).thenReturn("alice");
-        when(sessionRegistry.getAllPrincipals()).thenReturn(List.of(otherUserPrincipal));
-
-        userService.updateUser(request("john", "John", null, "ADMIN", true));
-
-        verify(sessionRegistry, never()).getAllSessions(any(), anyBoolean());
+        verify(sessionService, never()).expireUserSessions(anyString());
     }
 
     @Test

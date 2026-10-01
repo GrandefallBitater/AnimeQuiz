@@ -89,4 +89,116 @@ $(document).ready(function () {
     });
 
     //TODO create setAvatarModal
+
+    const setAvatarModalHtml = `
+<div class="modal-overlay" id="setAvatarModal">
+    <div class="modal-box modal-centered">
+        <div class="modal-header">
+            <h3>Изменение аватарки</h3>
+            <button class="modal-close" id="closeSetAvatarModal" type="button" data-close>✕</button>
+        </div>
+
+        <form id="setAvatarForm">
+            <div class="form-group">
+                <label for="favatar">Файл изображения</label>
+                <input type="file" id="favatar" name="avatar" accept="image/*">
+                <span class="form-hint">PNG, JPG или WEBP. Не больше 5 МБ.</span>
+            </div>
+
+            <div class="form-group" style="text-align:center;">
+                <img id="avatarPreview" alt="Превью"
+                     style="display:none; max-width:140px; max-height:140px;
+                            border-radius:50%; object-fit:cover;
+                            border:2px solid rgba(168,85,247,0.5);
+                            box-shadow:0 0 25px rgba(124,58,237,0.35);">
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-ghost" id="cancelSetAvatarBtn">Отмена</button>
+                <button type="submit" class="btn-main" id="confirmSetAvatarBtn">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+`;
+
+    if (!$('#setAvatarModal').length) {
+        $('body').append(setAvatarModalHtml);
+    }
+
+    const $setAvatarModal = $('#setAvatarModal');
+
+    window.openSetAvatarModal = function () {
+        $setAvatarModal.addClass('open');
+        $('body').css('overflow', 'hidden');
+    };
+
+    function closeSetAvatarModal() {
+        $setAvatarModal.removeClass('open');
+        $('body').css('overflow', '');
+        $('#setAvatarForm')[0].reset();
+        $('#avatarPreview').hide().attr('src', '');
+    }
+
+    $('#cancelSetAvatarBtn, #closeSetAvatarModal').on('click', closeSetAvatarModal);
+
+    $setAvatarModal.on('click', function (e) {
+        if (e.target === this) closeSetAvatarModal();
+    });
+
+    $(document).on('keydown', function (e) {
+        if (e.key === 'Escape') closeSetAvatarModal();
+    });
+
+    $('#favatar').on('change', function () {
+        const file = this.files && this.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (ev) {
+            $('#avatarPreview').attr('src', ev.target.result).show();
+        };
+        reader.readAsDataURL(file);
+    });
+
+    $('#setAvatarForm').on('submit', function (e) {
+        e.preventDefault();
+
+        const fileInput = $('#favatar')[0];
+        if (!fileInput.files || !fileInput.files[0]) {
+            showToast('Выберите файл изображения', 'error');
+            return;
+        }
+
+        const csrfToken  = $('meta[name="_csrf"]').attr('content');
+        const csrfHeader = $('meta[name="_csrf_header"]').attr('content');
+
+        const formData = new FormData();
+        formData.append('avatar', fileInput.files[0]);
+
+        $.ajax({
+            url: '/profile/avatar/json',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            dataType: 'json',
+            headers: (csrfToken && csrfHeader) ? { [csrfHeader]: csrfToken } : {}
+        })
+            .done(function (response) {
+                showToast(response.message || 'Аватарка обновлена', 'success');
+                closeSetAvatarModal();
+                setTimeout(function () {
+                    window.location.reload();
+                }, 500);
+            })
+            .fail(function (xhr) {
+                console.error(xhr);
+                const msg = xhr.responseJSON && xhr.responseJSON.message
+                    ? xhr.responseJSON.message
+                    : 'Ошибка загрузки аватарки';
+                closeSetAvatarModal();
+                showToast(msg, 'error');
+            });
+    });
 });

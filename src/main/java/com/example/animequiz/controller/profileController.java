@@ -190,6 +190,22 @@ public class profileController {
                 .body(new FileSystemResource(file));
     }
 
+    @PostMapping("/profile/avatar/json")
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> setAvatarJson(@RequestParam("avatar") MultipartFile avatar,
+                                                Authentication auth, HttpServletRequest request,
+                                                HttpServletResponse response) {
+        String key = storageKey(auth, request, response);
+        try {
+            storageService.saveAvatar(key, avatar);
+            return ResponseEntity.ok(
+                    Collections.singletonMap("message", "Аватар обновлён"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Collections.singletonMap("message", e.getMessage()));
+        }
+    }
+
     //TODO create static object with this method
     private static boolean isCustomAdmin(Authentication a) {
         return a != null && a.getAuthorities().stream()

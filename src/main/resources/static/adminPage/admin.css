@@ -272,7 +272,6 @@ body {
     animation: pulseDot 2s ease-in-out infinite;
 }
 
-/* ===== Кнопки ===== */
 .btn-main {
     display: inline-flex;
     align-items: center;
@@ -374,7 +373,6 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ===== Панель пользователей ===== */
 .users-section { margin-bottom: 5rem; }
 .users-panel { padding: 2.25rem; }
 
@@ -487,134 +485,6 @@ body {
 }
 .empty-row { text-align: center; padding: 3rem 1rem !important; color: #66668a; font-size: 1.05rem; }
 
-/* ===== Модальные окна ===== */
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(5, 5, 15, 0.75);
-    backdrop-filter: blur(6px);
-    z-index: 200;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.5rem;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s ease;
-}
-.modal-overlay.open { opacity: 1; visibility: visible; }
-.modal-box {
-    width: 100%;
-    max-width: 480px;
-    background: linear-gradient(145deg, #1a1a3e, #0d0d1a);
-    border: 1px solid rgba(124, 58, 237, 0.35);
-    border-radius: 22px;
-    padding: 2.25rem;
-    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(124, 58, 237, 0.15);
-    transform: translateY(30px) scale(0.96);
-    transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    max-height: 90vh;
-    overflow-y: auto;
-}
-.modal-overlay.open .modal-box { transform: translateY(0) scale(1); }
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.75rem;
-    gap: 1rem;
-}
-.modal-header h3 { color: #fff; font-size: 1.4rem; }
-.modal-close {
-    background: rgba(255, 255, 255, 0.06);
-    border: none;
-    color: #8888aa;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 0.95rem;
-    transition: all 0.25s ease;
-    flex-shrink: 0;
-}
-.modal-close:hover {
-    background: rgba(255, 107, 157, 0.2);
-    color: #ff6b9d;
-    transform: rotate(90deg);
-}
-
-.form-group { margin-bottom: 1.25rem; }
-.form-group label {
-    display: block;
-    font-size: 0.85rem;
-    color: #b0b0cc;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-}
-.form-group input,
-.form-group select {
-    width: 100%;
-    background: rgba(13, 13, 26, 0.85);
-    border: 1px solid rgba(124, 58, 237, 0.25);
-    border-radius: 12px;
-    padding: 0.8rem 1.1rem;
-    color: #e0e0e0;
-    font-family: inherit;
-    font-size: 0.95rem;
-    outline: none;
-    transition: all 0.25s ease;
-}
-.form-group input:focus,
-.form-group select:focus {
-    border-color: #a855f7;
-    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
-}
-.form-group input::placeholder { color: #66668a; }
-.form-group select { cursor: pointer; }
-.form-group select option { background: #1a1a3e; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-
-.modal-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: flex-end;
-    margin-top: 1.75rem;
-}
-.modal-actions-center { justify-content: center; }
-
-.modal-danger { text-align: center; max-width: 420px; }
-.danger-icon { font-size: 3rem; margin-bottom: 1rem; display: block; }
-.modal-danger h3 { color: #fff; margin-bottom: 0.75rem; font-size: 1.35rem; }
-.modal-danger p { color: #8888aa; line-height: 1.7; }
-.modal-danger p b { color: #ff6b9d; }
-
-/* ===== Тосты ===== */
-.toast-container {
-    position: fixed;
-    bottom: 1.5rem;
-    right: 1.5rem;
-    z-index: 300;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-.toast {
-    background: linear-gradient(145deg, #1a1a3e, #0d0d1a);
-    border: 1px solid rgba(124, 58, 237, 0.4);
-    color: #e0e0e0;
-    padding: 0.95rem 1.5rem;
-    border-radius: 14px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    font-size: 0.92rem;
-    transform: translateX(120%);
-    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    max-width: 340px;
-}
-.toast.show { transform: translateX(0); }
-.toast-error { border-color: rgba(239, 68, 68, 0.5); }
-
-/* ===== Анимации появления ===== */
 @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(40px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -638,7 +508,6 @@ body {
     transform: translateY(0);
 }
 
-/* ===== Кастомный скроллбар ===== */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: #0d0d1a; }
 ::-webkit-scrollbar-thumb {
@@ -646,7 +515,6 @@ body {
     border-radius: 4px;
 }
 
-/* ===== Адаптивность ===== */
 @media (max-width: 991px) {
     .hero-title { font-size: 2.6rem; }
     .dash-grid { grid-template-columns: 1fr; }

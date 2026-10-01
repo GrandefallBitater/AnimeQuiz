@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -30,6 +31,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -53,22 +56,19 @@ public class profileController {
         this.shikimoriService = shikimoriService;
     }
 
-    //TODO make cleanName check for right username
     @PostMapping("/setCustomName")
     @ResponseBody
-    public String setCustomUserName(@RequestParam String userName, Authentication authentication, HttpServletResponse response) {
-        if ((authentication != null) && authentication.isAuthenticated()) {
-            return "вы залогинены, перед установкой никнейма, пожалуйста выйдите из аккаунта";
-        }else {
-            String cleanName = userName.trim();
-            if (!cleanName.isEmpty()) {
-                Cookie cookie = new Cookie("CustomUserName", cleanName);
-                cookie.setMaxAge(7 * 24 * 60 * 60);
-                cookie.setPath("/");
-                cookie.setHttpOnly(true);
-                response.addCookie(cookie);
-            }
-            return "operation successfully";
+    public ResponseEntity<Map<String, String>> setCustomUserName(@RequestParam String userName,
+                                                                 Authentication authentication,
+                                                                 HttpServletResponse response,
+                                                                 HttpServletRequest request) {
+        String result = executeNameUpdate(userName, authentication, response, request);
+
+        if ("success".equals(result)) {
+            return ResponseEntity.ok(Collections.singletonMap("message", "Имя успешно обновлено"));
+        } else {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Collections.singletonMap("message", result));
         }
     }
 
@@ -94,12 +94,23 @@ public class profileController {
 
     @PostMapping("/profile/name")
     public String setName(@RequestParam String userName, Authentication auth,
-                          HttpServletResponse response, RedirectAttributes ra) {
+                          HttpServletResponse response, HttpServletRequest request, RedirectAttributes ra) {
+        String result = executeNameUpdate(userName, auth, response, request);
+
+        if ("success".equals(result)) {
+            ra.addFlashAttribute("message", "Имя обновлено");
+        } else {
+            ra.addFlashAttribute("error", result);
+        }
+        return "redirect:/profile";
+    }
+
+    private String executeNameUpdate(String userName, Authentication auth, HttpServletResponse response, HttpServletRequest request) {
         String clean = userName == null ? "" : userName.trim();
         if (clean.isEmpty()) {
-            ra.addFlashAttribute("error", "Имя не может быть пустым");
-            return "redirect:/profile";
+            return "Имя не может быть пустым";
         }
+
         if (isAuthed(auth)) {
             Optional<User> found = userRepository.findByUsername(auth.getName());
             if (found.isPresent()) {
@@ -109,6 +120,13 @@ public class profileController {
 
                 UsernamePasswordAuthenticationToken newAuth = getNewAuth(auth, clean);
                 SecurityContextHolder.getContext().setAuthentication(newAuth);
+                jakarta.servlet.http.HttpSession session = request.getSession(false);
+                if (session != null) {
+                    session.setAttribute(
+                            org.springframework.security.web.context.HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
+                            SecurityContextHolder.getContext()
+                    );
+                }
             }
         } else {
             Cookie cookie = new Cookie(NAME_COOKIE, clean);
@@ -117,8 +135,7 @@ public class profileController {
             cookie.setHttpOnly(true);
             response.addCookie(cookie);
         }
-        ra.addFlashAttribute("message", "Имя обновлено");
-        return "redirect:/profile";
+        return "success";
     }
 
     //TODO create static object with this method

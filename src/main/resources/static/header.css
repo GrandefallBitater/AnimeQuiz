@@ -82,6 +82,7 @@
 .dropdown-menu a:hover { background: rgba(124, 58, 237, 0.2); color: #fff; }
 
 .btn-logout {
+    background: transparent;
     padding: 0.5rem 1.3rem;
     border-radius: 30px;
     border: 1px solid rgba(255, 107, 157, 0.4);
@@ -91,6 +92,8 @@
     font-weight: 600;
     transition: all 0.25s ease;
     white-space: nowrap;
+    font-family: inherit;
+    cursor: pointer;
 }
 .btn-logout:hover {
     background: rgba(255, 107, 157, 0.12);

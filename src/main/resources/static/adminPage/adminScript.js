@@ -23,8 +23,8 @@ $(document).ready(function () {
     const $deleteModal = $('#deleteModal');
     const $deleteUserName = $('#deleteUserName');
 
-    const $adminNameField =$('#adminDisplayName');
-    const $adminAvatarField =$('#adminAvatar');
+    const $adminNameField = $('#adminDisplayName');
+    const $adminAvatarField = $('#adminAvatar');
     const $adminRoleBadge = $('#adminRoleBadge');
     const $adminStatusField = $('#adminStatusField');
 
@@ -43,36 +43,38 @@ $(document).ready(function () {
             type: 'GET',
             dataType: 'json'
         }).done(function (admin) {
-            if (admin.authenticated) {
-                if ($adminNameField.length) {
-                    $adminNameField.text(admin.displayName);
-                }
+            if (!admin.authenticated) return;
 
-                if ($adminRoleBadge.length && admin.role) {
-                    const readableRole = roleNames[admin.role] || admin.role;
-                    $adminRoleBadge.text(readableRole);
-                    $adminRoleBadge.attr('class', 'role-badge role-' + admin.role.toLowerCase());
-                }
+            if ($adminNameField.length) {
+                $adminNameField.text(admin.displayName);
+            }
 
-                if ($adminStatusField.length && admin.enabled !== undefined) {
-                    const statusKey = admin.enabled ? 'enabled' : 'disabled';
-                    const readableStatus = statusNames[statusKey];
-                    $adminStatusField.html('<span class="status-dot"></span>' + readableStatus);
-                    $adminStatusField.attr('class', 'status-badge status-' + statusKey);
-                }
+            if ($adminRoleBadge.length && admin.role) {
+                const readableRole = roleNames[admin.role] || admin.role;
+                $adminRoleBadge
+                    .text(readableRole)
+                    .attr('class', 'role-badge role-' + admin.role.toLowerCase());
+            }
 
-                if ($adminAvatarField.length) {
-                    if ($adminAvatarField.is('img')) {
-                        $adminAvatarField.attr('src', admin.avatarUrl);
-                    } else {
-                        $adminAvatarField.text('');
-                        $adminAvatarField.css('background-image', 'url(' + admin.avatarUrl + ')');
-                        $adminAvatarField.css({
+            if ($adminStatusField.length && admin.enabled !== undefined) {
+                const statusKey = admin.enabled ? 'enabled' : 'disabled';
+                $adminStatusField
+                    .html('<span class="status-dot"></span>' + statusNames[statusKey])
+                    .attr('class', 'status-badge status-' + statusKey);
+            }
+
+            if ($adminAvatarField.length) {
+                if ($adminAvatarField.is('img')) {
+                    $adminAvatarField.attr('src', admin.avatarUrl);
+                } else {
+                    $adminAvatarField
+                        .text('')
+                        .css({
+                            'background-image': 'url(' + admin.avatarUrl + ')',
                             'background-size': 'cover',
                             'background-position': 'center',
                             'background-repeat': 'no-repeat'
                         });
-                    }
                 }
             }
         }).fail(function (xhr) {
@@ -90,7 +92,7 @@ $(document).ready(function () {
                 users = data.map(user => ({
                     id: user.username,
                     nick: user.displayName || user.username,
-                    role: user.role.toUpperCase() || 'USER',
+                    role: (user.role || 'USER').toUpperCase(),
                     status: user.enabled ? 'enabled' : 'disabled',
                     avatar: user.avatarUrl || defaultLogoUrl
                 }));
@@ -116,9 +118,9 @@ $(document).ready(function () {
                 <td>
                     <div class="table-user">
                         <div class="table-avatar">
-                            <img src="${u.avatar}" 
-                                 alt="avatar" 
-                                 style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" 
+                            <img src="${u.avatar}"
+                                 alt="avatar"
+                                 style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"
                                  onerror="this.onerror=null; this.src='${defaultLogoUrl}';" />
                         </div>
                         <div>
@@ -154,23 +156,13 @@ $(document).ready(function () {
         applyFilter();
     });
 
-    function openModal($modal) {
-        $modal.addClass('open');
-        $('body').css('overflow', 'hidden');
-    }
-
-    function closeModal($modal) {
-        $modal.removeClass('open');
-        $('body').css('overflow', '');
-    }
-
     function openCreateModal() {
         editingId = null;
         $userForm[0].reset();
         $passRow.show();
         $userModalTitle.text('Создание пользователя');
         $submitUserBtn.text('Создать');
-        openModal($userModal);
+        Modal.open($userModal);
     }
 
     function openEditModal(id) {
@@ -183,7 +175,7 @@ $(document).ready(function () {
         $fStatus.val(u.status);
         $userModalTitle.text('Редактирование пользователя');
         $submitUserBtn.text('Сохранить изменения');
-        openModal($userModal);
+        Modal.open($userModal);
     }
 
     function openDeleteModal(id) {
@@ -191,8 +183,12 @@ $(document).ready(function () {
         if (!u) return;
         pendingDeleteId = id;
         $deleteUserName.text(u.nick);
-        openModal($deleteModal);
+        Modal.open($deleteModal);
     }
+
+    $('#closeUserModal').on('click', function () {
+        Modal.close($userModal);
+    });
 
     $tbody.on('click', '[data-action]', function () {
         const action = $(this).data('action');
@@ -228,12 +224,18 @@ $(document).ready(function () {
                 url: '/createUser',
                 type: 'POST',
                 contentType: 'application/json',
-                data: JSON.stringify({username: nick, displayName: nick, role: role, enabled: enabled, password: pass}),
+                data: JSON.stringify({
+                    username: nick,
+                    displayName: nick,
+                    role: role,
+                    enabled: enabled,
+                    password: pass
+                }),
                 dataType: 'json'
             })
                 .done(function (response) {
                     showToast(response.message, 'success');
-                    loadUsers()
+                    loadUsers();
                 })
                 .fail(function (xhr) {
                     console.error(xhr);
@@ -244,14 +246,20 @@ $(document).ready(function () {
                 url: '/editUser',
                 type: 'POST',
                 contentType: 'application/json',
-                data: JSON.stringify({username: editingId, displayName: nick, role: role, enabled: enabled, password: "no"}),
+                data: JSON.stringify({
+                    username: editingId,
+                    displayName: nick,
+                    role: role,
+                    enabled: enabled,
+                    password: "no"
+                }),
                 dataType: 'json'
             })
                 .done(function (response) {
                     showToast(response.message, 'success');
                     if (response.isSelfUpdate === true) {
                         showToast('Ваш профиль обновлён. Перенаправление...', 'info');
-                        setTimeout(function() {
+                        setTimeout(function () {
                             window.location.href = '/profile';
                         }, 1200);
                         return;
@@ -264,51 +272,40 @@ $(document).ready(function () {
                 });
         }
 
-        closeModal($userModal);
+        Modal.close($userModal);
         applyFilter();
     });
 
     $('#confirmDeleteBtn').on('click', function () {
         const u = users.find(x => x.id === pendingDeleteId);
-        const name = u.id;
+        if (!u) {
+            Modal.close($deleteModal);
+            return;
+        }
 
         $.ajax({
             url: '/deleteUser',
             type: 'DELETE',
             contentType: 'application/json',
-            data: JSON.stringify({ username: name }),
+            data: JSON.stringify({ username: u.id }),
             dataType: 'json'
         })
             .done(function (response) {
                 showToast(response.message, 'success');
-                loadUsers()
+                loadUsers();
             })
             .fail(function (xhr) {
                 console.error(xhr);
                 showToast('Ошибка запроса', 'error');
             });
+
         pendingDeleteId = null;
-        closeModal($deleteModal);
+        Modal.close($deleteModal);
         applyFilter();
     });
 
-    $('#closeUserModal').on('click', function () { closeModal($userModal); });
-    $('#cancelUserBtn').on('click', function () { closeModal($userModal); });
-    $('#cancelDeleteBtn').on('click', function () { closeModal($deleteModal); });
-
-    $userModal.on('click', function (e) {
-        if (e.target === this) closeModal($userModal);
-    });
-    $deleteModal.on('click', function (e) {
-        if (e.target === this) closeModal($deleteModal);
-    });
-
-    $(document).on('keydown', function (e) {
-        if (e.key === 'Escape') {
-            closeModal($userModal);
-            closeModal($deleteModal);
-        }
-    });
+    $('#cancelUserBtn').on('click',   function () { Modal.close($userModal); });
+    $('#cancelDeleteBtn').on('click', function () { Modal.close($deleteModal); });
 
     const $shikimoriBtn = $('#shikimoriBtn');
     const $lastSync = $('#lastSync');
@@ -317,7 +314,7 @@ $(document).ready(function () {
         const $btn = $(this);
         if ($btn.prop('disabled')) return;
 
-        showToast("выполняется импорт, пожалуйста, подождите")
+        showToast('Выполняется импорт, пожалуйста, подождите');
         $btn.prop('disabled', true);
         $btn.html('<span class="spinner"></span> Загрузка...');
 
@@ -352,7 +349,7 @@ $(document).ready(function () {
             .fail(function (xhr) {
                 console.error(xhr);
                 showToast('Ошибка запроса', 'error');
-            })
+            });
     }
 
     function revealOnScroll() {

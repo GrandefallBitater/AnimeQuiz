@@ -1,4 +1,3 @@
-// ===== Анимация чисел (счётчики) при скролле =====
 function animateCounters() {
     const counters = document.querySelectorAll('.stat-number');
     counters.forEach(counter => {
@@ -21,7 +20,6 @@ function animateCounters() {
     });
 }
 
-// ===== Scroll Reveal анимация =====
 function revealOnScroll() {
     const elements = document.querySelectorAll('.reveal-on-scroll');
     elements.forEach(el => {
@@ -35,7 +33,6 @@ function revealOnScroll() {
     });
 }
 
-// ===== Intersection Observer для счётчиков =====
 let countersAnimated = false;
 const statsSection = document.querySelector('.stats-section');
 
@@ -50,12 +47,10 @@ const observer = new IntersectionObserver((entries) => {
 
 if (statsSection) observer.observe(statsSection);
 
-// ===== Scroll listener =====
 window.addEventListener('scroll', () => {
     revealOnScroll();
 });
 
-// Вызываем при загрузке
 document.addEventListener('DOMContentLoaded', () => {
     revealOnScroll();
 });

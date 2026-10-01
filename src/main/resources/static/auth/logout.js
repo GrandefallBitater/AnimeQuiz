@@ -3,7 +3,7 @@
 $(document).ready(function () {
     const logoutModalHtml = `
         <div class="modal-overlay" id="logoutModal">
-            <div class="modal-box">
+            <div class="modal-box modal-centered">
                 <span class="modal-icon"></span>
                 <h3>Выйти из аккаунта?</h3>
                 <p>Вы действительно хотите завершить сессию?<br>
@@ -27,7 +27,6 @@ $(document).ready(function () {
         $('body').css('overflow', 'hidden');
     };
 
-    // Закрытие
     function closeLogoutModal() {
         $logoutModal.removeClass('open');
         $('body').css('overflow', '');

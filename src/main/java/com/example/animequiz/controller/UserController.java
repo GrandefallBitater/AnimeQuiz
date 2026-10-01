@@ -90,7 +90,7 @@ public class UserController {
         String avatarKey = "u_" + user.getUsername();
         boolean hasAvatar = storageService.findAvatar(avatarKey).isPresent();
 
-        String avatarUrl = hasAvatar ? "/profile/avatar?user=" + user.getUsername() : "/img/logo.png";
+        String avatarUrl = hasAvatar ? "/profile/avatar?user=" + user.getUsername() : "/server-images/anime-logo.png";
 
         return new UserDto(
                 user.getUsername(),

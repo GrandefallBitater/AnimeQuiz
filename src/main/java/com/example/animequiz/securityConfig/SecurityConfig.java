@@ -3,6 +3,8 @@ package com.example.animequiz.securityConfig;
 import com.example.animequiz.repository.AuthoritiesRepository;
 import com.example.animequiz.repository.UserRepository;
 import com.example.animequiz.service.CustomUserDetailsService;
+import lombok.Getter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -25,10 +27,18 @@ import org.springframework.security.web.session.HttpSessionEventPublisher;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 
+@Getter
 @Configuration
 @EnableMethodSecurity(securedEnabled = true)
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private final AuthenticationFailureHandler authenticationFailureHandler;
+
+    @Autowired
+    public SecurityConfig(AuthenticationFailureHandler failureHandler) {
+        this.authenticationFailureHandler = failureHandler;
+    }
 
     @Bean
     public HttpFirewall relaxedHttpFirewall() {
@@ -73,7 +83,7 @@ public class SecurityConfig {
                         .loginPage("/login")
                         .loginProcessingUrl("/login")
                         .defaultSuccessUrl("/", true)
-                        .failureUrl("/login?error=credentials")
+                        .failureHandler(authenticationFailureHandler)
                         .permitAll()
                 )
                 .logout(logout -> logout
@@ -116,4 +126,5 @@ public class SecurityConfig {
     public HttpSessionEventPublisher httpSessionEventPublisher() {
         return new HttpSessionEventPublisher();
     }
+
 }

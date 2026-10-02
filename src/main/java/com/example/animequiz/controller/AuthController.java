@@ -22,6 +22,9 @@ public class AuthController {
                 case "session":
                     model.addAttribute("errorMessage", "Сессия истекла. Войдите снова");
                     break;
+                case "disabled":
+                    model.addAttribute("errorMessage", "Вы были забанены, свяжитесь с администратором");
+                    break;
                 default:
                     model.addAttribute("errorMessage", "Ошибка авторизации");
             }

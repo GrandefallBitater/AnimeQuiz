@@ -133,7 +133,7 @@ class UserServiceTest {
         User existing = userWithRole("john", "ROLE_USER");
         when(userRepository.findById("john")).thenReturn(Optional.of(existing));
 
-        String message = userService.updateUser(request("john", "New Name", null, "USER", false));
+        String message = userService.updateUser(request("john", "New Name", null, "USER", false), true);
 
         assertThat(message).contains("обновлён");
         assertThat(existing.getDisplayName()).isEqualTo("New Name");
@@ -149,11 +149,11 @@ class UserServiceTest {
         User existing = userWithRole("john", "ROLE_USER");
         when(userRepository.findById("john")).thenReturn(Optional.of(existing));
 
-        userService.updateUser(request("john", "John", null, "ADMIN", true));
+        userService.updateUser(request("john", "John", null, "ADMIN", true), false);
 
         assertThat(existing.getAuthorities())
                 .extracting(Authority::getAuthority)
-                .containsExactly("ROLE_ADMIN"); // старые роли зачищены
+                .containsExactly("ROLE_ADMIN");
         verify(sessionService).expireUserSessions("john");
     }
 
@@ -161,7 +161,7 @@ class UserServiceTest {
     void updateUserDoesNotExpireSessionsOfOtherUsers() {
         User existing = userWithRole("john", "ROLE_USER");
         when(userRepository.findById("john")).thenReturn(Optional.of(existing));
-        userService.updateUser(request("john", "John", null, "USER", true));
+        userService.updateUser(request("john", "John", null, "USER", true), true);
 
         verify(sessionService, never()).expireUserSessions(anyString());
     }
@@ -170,7 +170,7 @@ class UserServiceTest {
     void updateUserThrowsWhenUserNotFound() {
         when(userRepository.findById("ghost")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> userService.updateUser(request("ghost", "G", null, "USER", true)))
+        assertThatThrownBy(() -> userService.updateUser(request("ghost", "G", null, "USER", true), false))
                 .isInstanceOf(EntityNotFoundException.class);
     }
 

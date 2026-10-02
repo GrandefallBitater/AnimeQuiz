@@ -141,16 +141,17 @@ public class UserController {
         boolean isSelfUpdate = false;
 
         try {
-            message = userService.updateUser(userDto);
-
             if (currentAuth != null && currentAuth.getName().equals(userDto.username())) {
-                isSelfUpdate = true;
+                message = userService.updateUser(userDto, isSelfUpdate);
 
                 userService.getUser(userDto.username()).ifPresent(user -> {
                     UsernamePasswordAuthenticationToken newAuth =
                             authService.refreshAuthentication(currentAuth, user);
                     authService.updateSecurityContext(newAuth, request);
                 });
+            }
+            else {
+                message = userService.updateUser(userDto, isSelfUpdate);
             }
         } catch (Exception e) {
             return Map.of("message", "Ошибка при обновлении: " + e.getMessage(), "success", false);

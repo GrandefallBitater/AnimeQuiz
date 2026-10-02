@@ -1,6 +1,5 @@
 package com.example.animequiz.controller;
 
-import com.example.animequiz.entity.User;
 import com.example.animequiz.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +18,6 @@ public class RegisterController {
         this.userService = userService;
     }
 
-    //TODO maybe a should use ResponseEntity<Map<String, String>> in another controllers
     @PostMapping("/register")
     public ResponseEntity<Map<String, String>> register(@RequestBody Map<String, String> body) {
         String username = body.get("username");

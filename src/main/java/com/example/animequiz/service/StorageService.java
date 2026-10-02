@@ -178,4 +178,5 @@ public class StorageService {
     }
 
     //TODO when importing siteAnimeList sort by name
+    //TODO when importing siteAnimeList we should download all pics
 }

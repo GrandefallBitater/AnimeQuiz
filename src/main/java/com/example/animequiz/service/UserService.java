@@ -75,7 +75,7 @@ public class UserService {
     }
 
     @Transactional
-    public  String updateUser(@RequestBody UserController.UserRequest userDto) {
+    public  String updateUser(@RequestBody UserController.UserRequest userDto, Boolean isSelfUpdate) {
         User user = userRepository.findById(userDto.username())
                 .orElseThrow(() -> new EntityNotFoundException("Пользователь не найден"));
 
@@ -100,11 +100,10 @@ public class UserService {
             authority.setUser(user);
 
             user.getAuthorities().add(authority);
-
-            //TODO this line expire session when we change role, but must expire when we change user details
+        }
+        if(!isSelfUpdate) {
             sessionService.expireUserSessions(userDto.username());
         }
-
         return "Пользователь обновлён";
     }
 

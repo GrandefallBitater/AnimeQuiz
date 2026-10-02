@@ -73,6 +73,8 @@ class ShikimoriServiceTest {
         assertThat(json.path("source").asText()).isEqualTo("shikimori.io");
         assertThat(json.path("count").asInt()).isEqualTo(1);
         assertThat(json.path("importedAt").asText()).isNotBlank();
+        assertThat(json.path("nickname").asText()).isEqualTo("TestUser");
+        assertThat(json.path("userId").asLong()).isEqualTo(42);
 
         JsonNode title = json.path("titles").get(0);
         assertThat(title.path("rateId").asLong()).isEqualTo(111);
@@ -80,17 +82,21 @@ class ShikimoriServiceTest {
         assertThat(title.path("status").asText()).isEqualTo("watching");
         assertThat(title.path("score").asInt()).isEqualTo(8);
         assertThat(title.path("episodes").asInt()).isEqualTo(5);
+        assertThat(title.path("rewatches").asInt()).isEqualTo(1);
         assertThat(title.path("totalEpisodes").asInt()).isEqualTo(24);
         assertThat(title.path("title").asText()).isEqualTo("Врата Штейна");
-        assertThat(title.path("url").asText()).isEqualTo("https://shikimori.io/animes/9253-steins-gate");
+        assertThat(title.path("url").asText())
+                .isEqualTo("https://shikimori.io/animes/9253-steins-gate");
         assertThat(title.path("imageUrl").asText())
                 .isEqualTo("https://shikimori.io/system/animes/preview/9253.jpg");
+
         wm.verify(1, getRequestedFor(urlPathEqualTo("/users/42/anime_rates"))
                 .withQueryParam("page", equalTo("1")));
         wm.verify(0, getRequestedFor(urlPathEqualTo("/users/42/anime_rates"))
                 .withQueryParam("page", equalTo("2")));
     }
 
+    @SuppressWarnings("RedundantThrows")
     @Test
     void importAnimeListFetchesSeveralPagesUntilLessThanLimit() throws Exception {
         stubUser("TestUser", 42);
@@ -128,11 +134,11 @@ class ShikimoriServiceTest {
         stubRatesPage(42, 1, """
                 [
                   {"id":1,"status":"completed","score":9,"episodes":12,"rewatches":0,
-                   "anime":{"id":1,"name":"A","russian":null,"kind":"tv","status":"released",
-                            "episodes":12,"url":"https://shikimori.io/animes/1-a"}},
+                   "anime":{"id":1,"name":"Alpha","russian":"Альфа","kind":"tv","status":"released",
+                            "episodes":12,"url":"https://shikimori.io/animes/1-alpha"}},
                   {"id":2,"status":"planned","score":0,"episodes":0,"rewatches":0,
-                   "anime":{"id":2,"name":"B","russian":"Б","kind":"movie","status":"anons",
-                            "episodes":1,"url":"/animes/2-b",
+                   "anime":{"id":2,"name":"Beta","russian":"Бета","kind":"movie","status":"anons",
+                            "episodes":1,"url":"/animes/2-beta",
                             "image":{"preview":"https://cdn.example/2.jpg"}}}
                 ]
                 """);
@@ -140,12 +146,14 @@ class ShikimoriServiceTest {
         ShikimoriService.ImportResult result = service.importAnimeList("TestUser");
 
         JsonNode titles = mapper.readTree(result.json()).path("titles");
-        // у первого аниме нет image -> imageUrl = null, url уже абсолютный
+        assertThat(titles.get(0).path("title").asText()).isEqualTo("Альфа");
         assertThat(titles.get(0).path("imageUrl").isNull()).isTrue();
-        assertThat(titles.get(0).path("url").asText()).isEqualTo("https://shikimori.io/animes/1-a");
-        // у второго абсолютный preview не дополняется ориджином
-        assertThat(titles.get(1).path("imageUrl").asText()).isEqualTo("https://cdn.example/2.jpg");
-        assertThat(titles.get(1).path("title").asText()).isEqualTo("Б");
+        assertThat(titles.get(0).path("url").asText())
+                .isEqualTo("https://shikimori.io/animes/1-alpha");
+
+        assertThat(titles.get(1).path("title").asText()).isEqualTo("Бета");
+        assertThat(titles.get(1).path("imageUrl").asText())
+                .isEqualTo("https://cdn.example/2.jpg");
     }
 
     @Test
@@ -165,6 +173,7 @@ class ShikimoriServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @SuppressWarnings("RedundantThrows")
     @Test
     void importAnimeListTrimsNickname() throws Exception {
         stubUser("Nick", 7);
@@ -186,6 +195,7 @@ class ShikimoriServiceTest {
                 .hasMessageContaining("403");
     }
 
+    @SuppressWarnings("RedundantThrows")
     @Test
     void importAnimeListRetriesOn429() throws Exception {
         wm.stubFor(get(urlEqualTo("/users/Retry?is_nickname=1"))
@@ -203,6 +213,58 @@ class ShikimoriServiceTest {
 
         assertThat(result.userId()).isEqualTo(9);
         wm.verify(2, getRequestedFor(urlEqualTo("/users/Retry?is_nickname=1")));
+    }
+
+    @Test
+    void importAnimeListSortsLettersBeforeDigits() throws Exception {
+        stubUser("TestUser", 42);
+        stubRatesPage(42, 1, """
+                [
+                  {"id":1,"status":"completed","score":8,"episodes":1,"rewatches":0,
+                   "anime":{"id":1,"name":"009-1","russian":"009-1","kind":"tv","status":"released",
+                            "episodes":1,"url":"/animes/1","image":{"preview":"/img/1.jpg"}}},
+                  {"id":2,"status":"completed","score":8,"episodes":1,"rewatches":0,
+                   "anime":{"id":2,"name":"Steins;Gate","russian":"Врата Штейна","kind":"tv",
+                            "status":"released","episodes":1,"url":"/animes/2",
+                            "image":{"preview":"/img/2.jpg"}}},
+                  {"id":3,"status":"completed","score":8,"episodes":1,"rewatches":0,
+                   "anime":{"id":3,"name":"Aria","russian":"Ария","kind":"tv","status":"released",
+                            "episodes":1,"url":"/animes/3","image":{"preview":"/img/3.jpg"}}}
+                ]
+                """);
+
+        JsonNode titles = mapper.readTree(service.importAnimeList("TestUser").json())
+                .path("titles");
+
+        assertThat(titles.get(0).path("title").asText()).isEqualTo("Ария");
+        assertThat(titles.get(1).path("title").asText()).isEqualTo("Врата Штейна");
+        assertThat(titles.get(2).path("title").asText()).isEqualTo("009-1");
+    }
+
+    @Test
+    void importAnimeListIgnoresLeadingPunctuationInSortKey() throws Exception {
+        stubUser("TestUser", 42);
+        stubRatesPage(42, 1, """
+                [
+                  {"id":1,"status":"completed","score":8,"episodes":1,"rewatches":0,
+                   "anime":{"id":1,"name":"_Summer","russian":"_Лето","kind":"tv","status":"released",
+                            "episodes":1,"url":"/animes/1","image":{"preview":"/img/1.jpg"}}},
+                  {"id":2,"status":"completed","score":8,"episodes":1,"rewatches":0,
+                   "anime":{"id":2,"name":"Bakemonogatari","russian":"Моногатари","kind":"tv",
+                            "status":"released","episodes":1,"url":"/animes/2",
+                            "image":{"preview":"/img/2.jpg"}}},
+                  {"id":3,"status":"completed","score":8,"episodes":1,"rewatches":0,
+                   "anime":{"id":3,"name":"Aria","russian":"Ария","kind":"tv","status":"released",
+                            "episodes":1,"url":"/animes/3","image":{"preview":"/img/3.jpg"}}}
+                ]
+                """);
+
+        JsonNode titles = mapper.readTree(service.importAnimeList("TestUser").json())
+                .path("titles");
+
+        assertThat(titles.get(0).path("title").asText()).isEqualTo("Ария");
+        assertThat(titles.get(1).path("title").asText()).isEqualTo("_Лето");
+        assertThat(titles.get(2).path("title").asText()).isEqualTo("Моногатари");
     }
 
     @Test
@@ -226,6 +288,28 @@ class ShikimoriServiceTest {
         assertThat(first.path("rateId").asLong()).isZero();
         assertThat(first.path("animeId").asLong()).isEqualTo(1);
         assertThat(first.path("name").asText()).isEqualTo("Anime 1");
+    }
+
+    @Test
+    void importSiteAnimeListSortsLettersBeforeDigitsAndPunctuation() throws Exception {
+        wm.stubFor(get(urlPathEqualTo("/animes"))
+                .withQueryParam("page", equalTo("1"))
+                .willReturn(okJson("""
+                        [
+                          {"id":1,"name":"_Summer","russian":"_Лето","kind":"tv","status":"released",
+                           "episodes":1,"url":"/animes/1","image":{"preview":"/img/1.jpg"}},
+                          {"id":2,"name":"Aria","russian":"Ария","kind":"tv","status":"released",
+                           "episodes":1,"url":"/animes/2","image":{"preview":"/img/2.jpg"}},
+                          {"id":3,"name":"009-1","russian":"009-1","kind":"tv","status":"released",
+                           "episodes":1,"url":"/animes/3","image":{"preview":"/img/3.jpg"}}
+                        ]
+                        """)));
+
+        JsonNode titles = mapper.readTree(service.importSiteAnimeList()).path("titles");
+
+        assertThat(titles.get(0).path("title").asText()).isEqualTo("Ария");
+        assertThat(titles.get(1).path("title").asText()).isEqualTo("_Лето");
+        assertThat(titles.get(2).path("title").asText()).isEqualTo("009-1");
     }
 
     @Test

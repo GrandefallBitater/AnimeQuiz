@@ -1,13 +1,13 @@
 package com.example.animequiz.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.net.URI;
@@ -16,8 +16,13 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.text.Collator;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.function.IntFunction;
 
 @Slf4j
 @Service
@@ -46,24 +51,14 @@ public class ShikimoriService {
         this.siteOrigin = siteOrigin.replaceAll("/+$", "");
         this.userAgent = userAgent;
     }
-
+    
+    //TODO we should block user movement when user importing animeList
     @PreAuthorize("hasRole('ADMIN')")
     public byte[] importSiteAnimeList() {
-        ArrayNode titles = mapper.createArrayNode();
-        for (int page = 1; page <= MAX_PAGES; page++) {
-            log.info("Обработка страницы {}", page);
-            JsonNode rates = getJson("/animes?limit=" + PAGE_LIMIT + "&page=" + page);
-            if (rates == null || !rates.isArray() || rates.isEmpty()) {
-                break;
-            }
-            for (JsonNode rate : rates) {
-                titles.add(projectTitle(rate));
-            }
-            if (rates.size() < PAGE_LIMIT) {
-                break;
-            }
-            sleep(250);
-        }
+        ArrayNode titles = fetchAllPages(page -> getJson(
+                "/animes?limit=" + PAGE_LIMIT + "&page=" + page));
+
+        sortTitlesRu(titles);
 
         ObjectNode payload = mapper.createObjectNode();
         payload.put("source", "shikimori.io");
@@ -71,15 +66,13 @@ public class ShikimoriService {
         payload.put("count", titles.size());
         payload.set("titles", titles);
 
-        try {
-            return mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(payload);
-        } catch (IOException e) {
-            throw new ShikimoriException("Не удалось сериализовать список тайтлов", e);
-        }
+        log.info("Импорт окончен ({} тайтлов)", titles.size());
+        return serialize(payload);
     }
 
     public record ImportResult(long userId, String nickname, int count, String json) {}
 
+    @SuppressWarnings("LoggingSimilarMessage")
     public ImportResult importAnimeList(String nickname) {
         String clean = nickname == null ? "" : nickname.trim();
         if (clean.isEmpty()) {
@@ -92,11 +85,31 @@ public class ShikimoriService {
         long userId = user.get("id").asLong();
         String resolvedNick = user.path("nickname").asText(clean);
 
+        ArrayNode titles = fetchAllPages(page -> getJson(
+                "/users/" + userId + "/anime_rates?limit=" + PAGE_LIMIT + "&page=" + page));
+
+        sortTitlesRu(titles);
+
+        ObjectNode payload = mapper.createObjectNode();
+        payload.put("nickname", resolvedNick);
+        payload.put("userId", userId);
+        payload.put("source", "shikimori.io");
+        payload.put("importedAt", Instant.now().toString());
+        payload.put("count", titles.size());
+        payload.set("titles", titles);
+
+        log.info("Импорт окончен ({} тайтлов)", titles.size());
+        String json = serializeToString(payload);
+        return new ImportResult(userId, resolvedNick, titles.size(), json);
+    }
+
+    private ArrayNode fetchAllPages(IntFunction<JsonNode> pageFetcher) {
         ArrayNode titles = mapper.createArrayNode();
         for (int page = 1; page <= MAX_PAGES; page++) {
-            //noinspection LoggingSimilarMessage
-            log.info("Обработка страницы {}", page);
-            JsonNode rates = getJson("/users/" + userId + "/anime_rates?limit=" + PAGE_LIMIT + "&page=" + page);
+            if (page % 20 == 0) {
+                log.info("Обработка страницы {}", page);
+            }
+            JsonNode rates = pageFetcher.apply(page);
             if (rates == null || !rates.isArray() || rates.isEmpty()) {
                 break;
             }
@@ -108,18 +121,57 @@ public class ShikimoriService {
             }
             sleep(250);
         }
+        return titles;
+    }
 
-        ObjectNode payload = mapper.createObjectNode();
-        payload.put("nickname", resolvedNick);
-        payload.put("userId", userId);
-        payload.put("source", "shikimori.io");
-        payload.put("importedAt", Instant.now().toString());
-        payload.put("count", titles.size());
-        payload.set("titles", titles);
+    private void sortTitlesRu(ArrayNode titles) {
+        List<JsonNode> list = new ArrayList<>(titles.size());
+        titles.forEach(list::add);
 
+        Collator ru = Collator.getInstance(new Locale("ru", "RU"));
+        ru.setStrength(Collator.PRIMARY);
+
+        list.sort((a, b) -> {
+            String keyA = normalizeSortKey(a);
+            String keyB = normalizeSortKey(b);
+
+            boolean aLetter = startsWithLetter(keyA);
+            boolean bLetter = startsWithLetter(keyB);
+
+            if (aLetter != bLetter) {
+                return aLetter ? -1 : 1;
+            }
+            return ru.compare(keyA, keyB);
+        });
+
+        titles.removeAll();
+        titles.addAll(list);
+    }
+
+    private String normalizeSortKey(JsonNode n) {
+        String russian = n.path("russian").asText("").strip();
+        String name = n.path("name").asText("").strip();
+        String key = russian.isEmpty() ? name : russian;
+        String normalized = key.replaceFirst("^[^\\p{L}\\p{N}]+", "");
+        return normalized.isEmpty() ? key : normalized;
+    }
+
+    private boolean startsWithLetter(String s) {
+        if (s == null || s.isEmpty()) return false;
+        return Character.isLetter(s.codePointAt(0));
+    }
+
+    private byte[] serialize(ObjectNode payload) {
         try {
-            String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(payload);
-            return new ImportResult(userId, resolvedNick, titles.size(), json);
+            return mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(payload);
+        } catch (IOException e) {
+            throw new ShikimoriException("Не удалось сериализовать список тайтлов", e);
+        }
+    }
+
+    private String serializeToString(ObjectNode payload) {
+        try {
+            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(payload);
         } catch (IOException e) {
             throw new ShikimoriException("Не удалось сериализовать список тайтлов", e);
         }

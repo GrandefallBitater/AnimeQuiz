@@ -63,6 +63,7 @@ body {
     box-shadow: 0 20px 60px rgba(124, 58, 237, 0.12);
 }
 
+/*noinspection CssNonIntegerLengthInPixels*/
 .panel-label {
     font-size: 0.95rem;
     font-weight: 600;
@@ -422,6 +423,8 @@ body {
     border-spacing: 0;
     min-width: 640px;
 }
+
+/*noinspection CssNonIntegerLengthInPixels*/
 .users-table th {
     text-transform: uppercase;
     font-size: 0.72rem;
@@ -532,3 +535,46 @@ body {
     .users-toolbar { flex-direction: column; align-items: stretch; }
     .search-box { max-width: 100%; }
 }
+
+.import-progress {
+    width: 100%;
+    margin-top: 1.25rem;
+}
+.import-progress-bar-wrap {
+    width: 100%;
+    height: 8px;
+    border-radius: 6px;
+    background: rgba(124, 58, 237, 0.15);
+    overflow: hidden;
+    position: relative;
+}
+.import-progress-bar {
+    height: 100%;
+    width: 0;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #7c3aed, #a855f7, #ff6b9d);
+    background-size: 200% 100%;
+    transition: width 0.5s ease;
+    animation: shimmer 2s linear infinite;
+}
+.import-progress-bar.indeterminate {
+    width: 40% !important;
+    animation: indeterminate 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite, shimmer 2s linear infinite;
+}
+@keyframes shimmer {
+    from { background-position: 0 0; }
+    to   { background-position: 200% 0; }
+}
+@keyframes indeterminate {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(300%); }
+}
+.import-progress-info {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+    font-size: 0.82rem;
+    color: #8888aa;
+    gap: 1rem;
+}
+#importProgressStage { color: #b0b0cc; }

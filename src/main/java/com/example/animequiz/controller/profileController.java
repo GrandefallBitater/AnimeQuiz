@@ -2,14 +2,15 @@ package com.example.animequiz.controller;
 
 import com.example.animequiz.entity.User;
 import com.example.animequiz.repository.UserRepository;
-import com.example.animequiz.service.AuthService;
-import com.example.animequiz.service.ShikimoriService;
-import com.example.animequiz.service.StorageService;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.animequiz.service.*;
+import com.example.animequiz.service.enrichment.EnrichmentWorker;
+import com.example.animequiz.service.importer.AnimeListImporter;
+import java.util.stream.Collectors;
+
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -26,13 +27,10 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
+@Slf4j
 @Controller
 public class profileController {
 
@@ -41,19 +39,28 @@ public class profileController {
 
     private final UserRepository userRepository;
     private final StorageService storageService;
-    private final ShikimoriService shikimoriService;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final UserListService userListService;
+    private final EnrichmentWorker enrichmentWorker;
     private final AuthService authService;
+    private final Map<String, AnimeListImporter> importers;
+    private final ActiveUserImports activeImports;
 
     @Autowired
     public profileController(UserRepository userRepository,
                              StorageService storageService,
-                             ShikimoriService shikimoriService,
-                             AuthService authService) {
+                             UserListService userListService, EnrichmentWorker enrichmentWorker,
+                             AuthService authService,
+                             List<AnimeListImporter> importersList, ActiveUserImports activeImports) {
         this.userRepository = userRepository;
         this.storageService = storageService;
-        this.shikimoriService = shikimoriService;
+        this.userListService = userListService;
+        this.enrichmentWorker = enrichmentWorker;
         this.authService = authService;
+        this.importers = importersList.stream()
+                .collect(Collectors.toMap(
+                        i -> i.sourceName().toLowerCase(),
+                        i -> i));
+        this.activeImports = activeImports;
     }
 
     @PostMapping("/setCustomName")
@@ -79,17 +86,97 @@ public class profileController {
         model.addAttribute("displayName", displayName(auth, request));
         model.addAttribute("authenticated", AuthService.isAuthenticated(auth));
         model.addAttribute("hasAvatar", storageService.findAvatar(key).isPresent());
-
         if (AuthService.isAuthenticated(auth)) {
-            storageService.readTitles(auth.getName()).ifPresent(bytes -> {
-                try {
-                    JsonNode info = mapper.readTree(bytes);
-                    model.addAttribute("titlesInfo", info);
-                } catch (Exception ignored) {
-                }
+            userRepository.findByUsername(auth.getName()).ifPresent(u -> {
+                boolean isAdmin = u.getAuthorities().stream()
+                        .anyMatch(a -> {
+                            String val = a.getAuthority();
+                            return "ADMIN".equalsIgnoreCase(val)
+                                    || "ROLE_ADMIN".equalsIgnoreCase(val);
+                        });
+                model.addAttribute("userRole", isAdmin ? "ADMIN" : "USER");
             });
         }
         return "profile";
+    }
+
+    @PostMapping("/profile/import/json")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> importTitlesJson(
+            @RequestParam String nickname,
+            @RequestParam(defaultValue = "shikimori") String source,
+            Authentication auth) {
+
+        if (!AuthService.isAuthenticated(auth)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Требуется вход в аккаунт"));
+        }
+
+        String username = auth.getName();
+        activeImports.start(username);
+        try {
+            AnimeListImporter importer = importerFor(source);
+            AnimeListImporter.ImportResult result = importer.importList(nickname);
+
+            userListService.replaceUserList(username, importer.sourceName(), result);
+            enrichmentWorker.trigger();
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("message", "Импортировано: " + result.count()
+                    + " (" + importer.sourceName() + ": " + result.nickname() + ")");
+            resp.put("count", result.count());
+            resp.put("nickname", result.nickname());
+            resp.put("source", importer.sourceName());
+            return ResponseEntity.ok(resp);
+
+        } catch (Exception e) {
+            log.error("Импорт не удался (source={}, nickname={})", source, nickname, e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", e.getMessage() != null
+                            ? e.getMessage() : e.getClass().getSimpleName()));
+        } finally {
+            activeImports.finish(username);
+        }
+    }
+
+    @GetMapping("/profile/titles")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getTitles(Authentication auth) {
+        if (!AuthService.isAuthenticated(auth)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("titles", List.of()));
+        }
+
+        UserListService.UserListView view = userListService.getUserListView(auth.getName());
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("titles", view.titles());
+        resp.put("count", view.titles().size());
+        resp.put("hiddenCount", view.hiddenCount());
+        resp.put("totalCount", view.totalCount());
+
+        userListService.getLastImport(auth.getName()).ifPresent(ui -> {
+            resp.put("source", ui.getSource());
+            resp.put("importedAt", ui.getImportedAt().toString());
+        });
+        return ResponseEntity.ok(resp);
+    }
+
+    @GetMapping("/profile/import/status")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> importStatus(Authentication auth) {
+        if (!AuthService.isAuthenticated(auth)) return ResponseEntity.status(401).build();
+
+        boolean running = activeImports.isRunning(auth.getName());
+        UserListService.UserListView view = userListService.getUserListView(auth.getName());
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("running", running);
+        resp.put("total", view.totalCount());
+        resp.put("ready", view.titles().size());
+        resp.put("hidden", view.hiddenCount());
+        resp.put("done", !running && view.hiddenCount() == 0);
+        return ResponseEntity.ok(resp);
     }
 
     @PostMapping("/profile/name")
@@ -171,8 +258,8 @@ public class profileController {
     @PostMapping("/profile/avatar/json")
     @ResponseBody
     public ResponseEntity<Map<String, String>> setAvatarJson(@RequestParam("avatar") MultipartFile avatar,
-                                                Authentication auth, HttpServletRequest request,
-                                                HttpServletResponse response) {
+                                                             Authentication auth, HttpServletRequest request,
+                                                             HttpServletResponse response) {
         String key = storageKey(auth, request, response);
         try {
             storageService.saveAvatar(key, avatar);
@@ -182,19 +269,6 @@ public class profileController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Collections.singletonMap("message", e.getMessage()));
         }
-    }
-
-    @PostMapping("/profile/import")
-    public String importTitles(@RequestParam String nickname, Authentication auth, RedirectAttributes ra) {
-        try {
-            ShikimoriService.ImportResult result = shikimoriService.importAnimeList(nickname);
-            storageService.saveTitles(auth.getName(), result.json().getBytes(StandardCharsets.UTF_8));
-            ra.addFlashAttribute("message",
-                    "Импортировано тайтлов: " + result.count() + " (Shikimori: " + result.nickname() + ")");
-        } catch (ShikimoriService.ShikimoriException | IllegalArgumentException e) {
-            ra.addFlashAttribute("error", e.getMessage());
-        }
-        return "redirect:/profile";
     }
 
     private String storageKey(Authentication auth, HttpServletRequest request, HttpServletResponse response) {
@@ -236,6 +310,12 @@ public class profileController {
         return null;
     }
 
-    //TODO create import anime list from YammyAnime
-    //TODO create import anime list from MAL
+    private AnimeListImporter importerFor(String source) {
+        AnimeListImporter importer = importers.get(
+                source == null ? "shikimori" : source.toLowerCase());
+        if (importer == null) {
+            throw new IllegalArgumentException("Неизвестный источник: " + source);
+        }
+        return importer;
+    }
 }

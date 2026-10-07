@@ -307,34 +307,85 @@ $(document).ready(function () {
     $('#cancelUserBtn').on('click',   function () { Modal.close($userModal); });
     $('#cancelDeleteBtn').on('click', function () { Modal.close($deleteModal); });
 
-    const $shikimoriBtn = $('#shikimoriBtn');
-    const $lastSync = $('#lastSync');
+    const $shikimoriBtn   = $('#shikimoriBtn');
+    const $progressWrap   = $('#importProgress');
+    const $progressBar    = $('#importProgressBar');
+    const $progressText   = $('#importProgressText');
+    const $progressStage  = $('#importProgressStage');
+
+    let pollTimer = null;
+
+    function setProgressUI(running, stage, processed, total, message) {
+        if (!running) {
+            $progressWrap.hide();
+            return;
+        }
+        $progressWrap.show();
+        const pct = (total && total > 0) ? Math.min(100, Math.round(processed / total * 100)) : null;
+        $progressBar.css('width', (pct ?? 15) + '%');
+        $progressBar.toggleClass('indeterminate', pct === null);
+        $progressText.text(pct != null
+            ? processed + ' / ' + total + ' (' + pct + '%)'
+            : processed + ' обработано');
+        $progressStage.text((stage || '') + (message ? ' — ' + message : ''));
+    }
+
+    function stopPolling() {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    }
+
+    function pollStatus() {
+        $.get('/ImportSiteAnimeList/status', function (s) {
+            if (s.running) {
+                setProgressUI(true, s.stage, s.processed, s.total, s.message);
+            } else {
+                setProgressUI(false);
+                stopPolling();
+                $shikimoriBtn.prop('disabled', false).html(
+                    '<span class="btn-icon"></span><span class="btn-label">Загрузить</span>');
+                if (s.state === 'done') {
+                    showToast(s.message || 'Импорт завершён', 'success');
+                    updateLastSync();
+                } else if (s.state === 'failed') {
+                    showToast('Ошибка: ' + (s.error || 'неизвестная'), 'error');
+                }
+            }
+        }).fail(function () {
+        });
+    }
+
+    function startPolling() {
+        stopPolling();
+        pollTimer = setInterval(pollStatus, 2000);
+        pollStatus();
+    }
 
     $shikimoriBtn.on('click', function () {
         const $btn = $(this);
         if ($btn.prop('disabled')) return;
 
-        showToast('Выполняется импорт, пожалуйста, подождите');
-        $btn.prop('disabled', true);
-        $btn.html('<span class="spinner"></span> Загрузка...');
+        $btn.prop('disabled', true)
+            .html('<span class="spinner"></span> Запуск...');
+        setProgressUI(true, 'enumeration', 0, null, 'Запуск...');
 
         $.ajax({
             url: '/ImportSiteAnimeList',
-            type: 'POST'
+            type: 'POST',
+            dataType: 'json'
         })
-            .done(function (response) {
-                $btn.addClass('success');
-                $lastSync.text(new Date().toLocaleString('ru-RU'));
-                showToast(response.message, 'success');
+            .done(function (resp) {
+                if (resp.running) {
+                    showToast('Импорт уже выполняется', 'info');
+                } else {
+                    showToast(resp.message || 'Импорт запущен', 'info');
+                }
+                startPolling();
             })
-            .fail(function (xhr) {
-                console.error(xhr);
-                showToast('Ошибка запроса', 'error');
-            })
-            .always(function () {
-                $btn.prop('disabled', false);
-                $btn.html('<span class="btn-icon"></span><span class="btn-label">Загрузить</span>');
-                updateLastSync();
+            .fail(function () {
+                showToast('Ошибка запуска импорта', 'error');
+                $btn.prop('disabled', false)
+                    .html('<span class="btn-icon"></span><span class="btn-label">Загрузить</span>');
+                setProgressUI(false);
             });
     });
 
@@ -370,5 +421,13 @@ $(document).ready(function () {
     updateLastSync();
     loadUsers().then(function () {
         revealOnScroll();
+    });
+    $.get('/ImportSiteAnimeList/status', function (s) {
+        if (s.running) {
+            $shikimoriBtn.prop('disabled', true)
+                .html('<span class="spinner"></span> Загрузка...');
+            setProgressUI(true, s.stage, s.processed, s.total, s.message);
+            startPolling();
+        }
     });
 });

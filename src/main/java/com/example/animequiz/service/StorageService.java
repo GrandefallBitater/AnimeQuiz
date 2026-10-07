@@ -3,7 +3,6 @@ package com.example.animequiz.service;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -12,6 +11,8 @@ import java.io.UncheckedIOException;
 import java.nio.file.*;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 
 @Service
@@ -23,29 +24,28 @@ public class StorageService {
             "image/gif", "gif",
             "image/webp", "webp"
     );
-    private static final long MAX_AVATAR_BYTES = 5L * 1024 * 1024; // 5 МБ
-
+    private static final long MAX_AVATAR_BYTES = 5L * 1024 * 1024;
     private final Path root;
     private final Path avatarsDir;
-    private final Path titlesDir;
-    private final Path siteTitlesDir;
+
+    private final ConcurrentHashMap<String, ReentrantLock> locks = new ConcurrentHashMap<>();
 
     public StorageService(@Value("${app.storage.location}") String location) {
         this.root = Paths.get(location).toAbsolutePath().normalize();
         this.avatarsDir = root.resolve("avatars");
-        this.titlesDir = root.resolve("titles");
-        this.siteTitlesDir = root.resolve("site_titles");
     }
 
     @PostConstruct
     public void init() {
         try {
             Files.createDirectories(avatarsDir);
-            Files.createDirectories(titlesDir);
-            Files.createDirectories(siteTitlesDir);
         } catch (IOException e) {
             throw new UncheckedIOException("Не удалось подготовить хранилище: " + root, e);
         }
+    }
+
+    private ReentrantLock lockFor(String key) {
+        return locks.computeIfAbsent(key, k -> new ReentrantLock());
     }
 
     public static String sanitizeKey(String key) {
@@ -55,7 +55,7 @@ public class StorageService {
         return cleaned;
     }
 
-    public String saveAvatar(String key, MultipartFile file) {
+    public void saveAvatar(String key, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Файл не выбран");
         }
@@ -67,34 +67,39 @@ public class StorageService {
             throw new IllegalArgumentException("Недопустимый формат: разрешены PNG, JPEG, GIF, WEBP");
         }
         String safe = sanitizeKey(key);
+        ReentrantLock lock = lockFor("avatar:" + safe);
+        lock.lock();
         try {
             deleteAvatar(safe);
             Path target = avatarsDir.resolve(safe + "." + ext);
             file.transferTo(target);
-            return target.getFileName().toString();
         } catch (IOException e) {
             throw new UncheckedIOException("Не удалось сохранить изображение", e);
+        } finally {
+            lock.unlock();
         }
     }
 
     public Optional<Path> findAvatar(String key) {
         String safe = sanitizeKey(key);
-        if (!Files.isDirectory(avatarsDir)) {
-            return Optional.empty();
-        }
-        try (Stream<Path> files = Files.list(avatarsDir)) {
-            return files
-                    .filter(p -> p.getFileName().toString().startsWith(safe + "."))
-                    .findFirst();
-        } catch (IOException e) {
-            return Optional.empty();
+        ReentrantLock lock = lockFor("avatar:" + safe);
+        lock.lock();
+        try {
+            if (!Files.isDirectory(avatarsDir)) return Optional.empty();
+            try (Stream<Path> files = Files.list(avatarsDir)) {
+                return files
+                        .filter(p -> p.getFileName().toString().startsWith(safe + "."))
+                        .findFirst();
+            } catch (IOException e) {
+                return Optional.empty();
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
     public void deleteAvatar(String safe) throws IOException {
-        if (!Files.isDirectory(avatarsDir)) {
-            return;
-        }
+        if (!Files.isDirectory(avatarsDir)) return;
         try (Stream<Path> files = Files.list(avatarsDir)) {
             files.filter(p -> p.getFileName().toString().startsWith(safe + "."))
                     .forEach(p -> {
@@ -114,69 +119,4 @@ public class StorageService {
         if (name.endsWith(".webp")) return MediaType.parseMediaType("image/webp");
         return MediaType.IMAGE_JPEG;
     }
-
-    public void saveTitles(String username, byte[] json) {
-        Path target = titlesDir.resolve("u_" + sanitizeKey(username) + ".json");
-        try {
-            Files.write(target, json,
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.TRUNCATE_EXISTING,
-                    StandardOpenOption.WRITE);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Не удалось сохранить список тайтлов", e);
-        }
-    }
-
-    @PreAuthorize("hasRole('ADMIN')")
-    public void saveSiteAnimeList(byte[] json) {
-        Path target = siteTitlesDir.resolve("Titles.json");
-        Path tempTarget = siteTitlesDir.resolve("Titles.json.tmp");
-
-        try {
-            Files.write(tempTarget, json,
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.TRUNCATE_EXISTING,
-                    StandardOpenOption.WRITE);
-
-            Files.move(tempTarget, target,
-                    StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.ATOMIC_MOVE);
-
-        } catch (IOException e) {
-            try {
-                Files.deleteIfExists(tempTarget);
-            } catch (IOException ignored) {
-                throw new UncheckedIOException(
-                        "Не удалось сохранить список тайтлов, старый файл сохранен, временный файл сохранён", e);
-            }
-            throw new UncheckedIOException("Не удалось сохранить список тайтлов, старый файл сохранен", e);
-        }
-    }
-
-    public Optional<byte[]> readTitles(String username) {
-        Path source = titlesDir.resolve("u_" + sanitizeKey(username) + ".json");
-        if (!Files.isRegularFile(source)) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(Files.readAllBytes(source));
-        } catch (IOException e) {
-            return Optional.empty();
-        }
-    }
-
-    public Optional<byte[]> readSiteAnimeList() {
-        Path source = siteTitlesDir.resolve("Titles.json");
-        if (!Files.isRegularFile(source)) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(Files.readAllBytes(source));
-        } catch (IOException e) {
-            return Optional.empty();
-        }
-    }
-
-    //TODO when importing siteAnimeList sort by name
-    //TODO when importing siteAnimeList we should download all pics
 }

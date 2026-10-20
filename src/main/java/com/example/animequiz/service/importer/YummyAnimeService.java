@@ -231,7 +231,7 @@ public class YummyAnimeService implements AnimeListImporter {
         String url = baseUrl + path;
         try {
             HttpRequest req = HttpRequest.newBuilder(URI.create(url))
-                    .timeout(Duration.ofSeconds(20))
+                    .timeout(Duration.ofSeconds(50))
                     .header("X-Application", appToken)
                     .header("Accept", "application/json")
                     .header("Lang", "ru")
@@ -242,10 +242,14 @@ public class YummyAnimeService implements AnimeListImporter {
                 throw new RuntimeException("YummyAnime 404: " + url);
             }
             if (resp.statusCode() != 200) {
+                log.error("YummyAnime вернул ошибку. Статус: {}. URL: {}. Ответ: {}",
+                        resp.statusCode(), url, resp.body());
                 throw new RuntimeException("YummyAnime HTTP " + resp.statusCode());
             }
             return mapper.readTree(resp.body());
         } catch (IOException e) {
+            log.error("YummyAnime IOException для URL: {}. Сообщение: {}. Причина: {}",
+                    url, e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "нет", e);
             throw new RuntimeException("YummyAnime недоступен: " + url, e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

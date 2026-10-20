@@ -11,7 +11,7 @@
 
   <groupId>com.example</groupId>
   <artifactId>AnimeQuiz</artifactId>
-  <version>0.1.10-SNAPSHOT</version>
+  <version>0.1.11-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>AnimeQuiz</name>
   <description>Аниме выбор картинок</description>
@@ -124,6 +124,56 @@
             </path>
           </annotationProcessorPaths>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-clean-plugin</artifactId>
+        <configuration>
+          <filesets>
+            <fileset>
+              <directory>${project.basedir}</directory>
+              <includes>
+                <include>AnimeQuiz/**</include>
+              </includes>
+            </fileset>
+          </filesets>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <execution>
+            <id>jpackage</id>
+            <phase>package</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <executable>jpackage</executable>
+              <arguments>
+                <argument>--type</argument>
+                <argument>app-image</argument>
+                <argument>--name</argument>
+                <argument>AnimeQuiz</argument>
+                <argument>--input</argument>
+                <argument>target</argument>
+                <argument>--main-jar</argument>
+                <argument>${project.build.finalName}.jar</argument>
+                <argument>--main-class</argument>
+                <argument>org.springframework.boot.loader.launch.JarLauncher</argument>
+                <argument>--icon</argument>
+                <argument>${project.basedir}/anime-logo.ico</argument>
+                <argument>--java-options</argument>
+                <argument>-Djava.net.preferIPv6Addresses=true</argument>
+                <argument>--dest</argument>
+                <argument>${user.home}/Desktop</argument>
+                <argument>--win-console</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

@@ -1,5 +1,7 @@
+const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+
 const stompClient = new StompJs.Client({
-    brokerURL: 'ws://localhost:8081/AniQuiz'
+    brokerURL: wsProtocol + window.location.host + '/AniQuiz'
 });
 
 stompClient.onConnect = (frame) => {

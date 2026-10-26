@@ -113,13 +113,26 @@ java -jar target/AnimeQuiz-*.jar
 
 > **Важно.** В `pom.xml` plugin `exec-maven-plugin` привязан к фазе `package`
 > и запускает `jpackage`. В результате `mvn package` дополнительно создаёт
-> app-image в `%USERPROFILE%\Desktop` и требует файл
+> app-image в `%USERPROFILE%\Desktop\AnimeQuiz` и требует файл
 > `anime-logo.ico` в корне проекта и JDK с утилитой `jpackage`.
 > Если нужен только исполняемый jar, пропустите этот шаг:
 >
 > ```powershell
 > mvn package -Dexec.skip=true
 > ```
+
+При сборке app-image:
+
+1. Старая папка `%USERPROFILE%\Desktop\AnimeQuiz` удаляется — иначе jpackage
+   отказывается работать («Application destination directory already exists»).
+   Поэтому перед сборкой закройте запущенное приложение.
+2. jpackage собирает образ из содержимого `target`.
+3. Каталог `scripts` копируется рядом с `AnimeQuiz.exe`, то есть в
+   `%USERPROFILE%\Desktop\AnimeQuiz\scripts`.
+
+Скрипты не зависят от расположения: пути они вычисляют от собственного
+каталога. Но задачи планировщика запоминают абсолютный путь, поэтому после
+переноса папки скрипты нужно зарегистрировать заново (см. ниже).
 
 ### Запуск с другим профилем или портом
 
@@ -255,6 +268,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\register-backup-task
 администратора, задачи создаются в режиме `Interactive` — они выполняются,
 когда пользователь вошёл в Windows. Для работы без входа в систему запустите
 скрипт от имени администратора.
+
+Задачи ссылаются на тот каталог, из которого запущен скрипт. Если запустить
+`register-backup-tasks.ps1` из `%USERPROFILE%\Desktop\AnimeQuiz\scripts`,
+планировщик будет брать скрипты оттуда, а не из репозитория.
 
 Проверка:
 

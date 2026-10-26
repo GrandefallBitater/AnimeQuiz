@@ -38,3 +38,18 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### AnimeQuiz backups and secrets ###
+backups/
+logs/
+*.log
+*.dump
+*.dump.sha256
+pgpass.conf
+.pgpass
+.env
+.env.local
+.env.*.local
+
+### Personal notes (not part of the public repository) ###
+docs/backup-restore.md

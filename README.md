@@ -17,6 +17,7 @@ Thymeleaf и локальное файловое хранилище для по�
 - [Хранилище файлов](#хранилище-файлов)
 - [Импорт каталога](#импорт-каталога)
 - [Резервное копирование](#резервное-копирование)
+- [Мониторинг базы данных](#мониторинг-базы-данных)
 - [Структура проекта](#структура-проекта)
 - [Диагностика](#диагностика)
 - [Безопасность](#безопасность)
@@ -128,7 +129,8 @@ java -jar target/AnimeQuiz-*.jar
    Поэтому перед сборкой закройте запущенное приложение.
 2. jpackage собирает образ из содержимого `target`.
 3. Каталог `scripts` копируется рядом с `AnimeQuiz.exe`, то есть в
-   `%USERPROFILE%\Desktop\AnimeQuiz\scripts`.
+   `%USERPROFILE%\Desktop\AnimeQuiz\scripts`. Внутри сохраняются подпапки
+   `backup` (резервное копирование) и `sql` (запросы для мониторинга).
 
 Скрипты не зависят от расположения: пути они вычисляют от собственного
 каталога. Но задачи планировщика запоминают абсолютный путь, поэтому после
@@ -233,7 +235,7 @@ app.storage.location=D:/animequiz/storage
 `pgpass`:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup-pgpass.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\setup-pgpass.ps1
 ```
 
 Скрипт создаст `%APPDATA%\postgresql\pgpass.conf`, ограничит права доступа
@@ -243,8 +245,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup-pgpass.ps1
 ### Ручной запуск
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup-db.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup-storage.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\backup-db.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\backup-storage.ps1
 ```
 
 Параметры:
@@ -260,7 +262,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup-storage.ps1
 ### Автоматический запуск
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\register-backup-tasks.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\register-backup-tasks.ps1
 ```
 
 Создаются задачи `AnimeQuiz DB Backup` и `AnimeQuiz Storage Backup` с
@@ -270,7 +272,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\register-backup-task
 скрипт от имени администратора.
 
 Задачи ссылаются на тот каталог, из которого запущен скрипт. Если запустить
-`register-backup-tasks.ps1` из `%USERPROFILE%\Desktop\AnimeQuiz\scripts`,
+`register-backup-tasks.ps1` из `%USERPROFILE%\Desktop\AnimeQuiz\scripts\backup`,
 планировщик будет брать скрипты оттуда, а не из репозитория.
 
 Проверка:
@@ -288,7 +290,7 @@ Get-ScheduledTaskInfo -TaskName "AnimeQuiz DB Backup"
 затрагивается:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\restore-db.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\restore-db.ps1
 ```
 
 Скрипт возьмёт самый свежий дамп, проверит контрольную сумму, создаст базу и
@@ -298,7 +300,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\restore-db.ps1
 приложения:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\restore-db.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\restore-db.ps1 `
     -TargetDatabase AnimeQuiz -Force
 ```
 
@@ -309,7 +311,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\restore-db.ps1 `
 ### Восстановление файлов
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\restore-storage.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\restore-storage.ps1
 ```
 
 Текущий каталог storage будет переименован в `storage.bak-<дата>`, архив
@@ -325,6 +327,34 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\restore-storage.ps1
 - Перед восстановлением рабочей базы остановите приложение.
 - Проверяйте бэкапы восстановлением: дамп, который ни разу не разворачивали,
   нельзя считать надёжным.
+
+## Мониторинг базы данных
+
+В `scripts/sql` лежат SQL-запросы только для чтения. Они помогают следить за
+каталогом: считать тайтлы и заглушки, проверять постеры, ошибки обогащения и
+распределение тайтлов по пользовательским спискам.
+
+| Файл | Что показывает |
+|---|---|
+| `01_overview.sql` | Общая сводка по каталогу: заглушки, постеры, обогащение, источники ID, сироты. |
+| `02_completeness_poster.sql` | Разбивка по `completeness` и `poster_status`. |
+| `03_by_user.sql` | Количество тайтлов и заглушек в списке каждого пользователя. |
+| `04_stubs.sql` | Список заглушек с ошибками обогащения и числом списков. |
+| `05_top_titles.sql` | Топ-50 тайтлов по числу списков пользователей. |
+
+Запуск через `psql`:
+
+```powershell
+psql -h localhost -p 5433 -U postgres -d AnimeQuiz -f scripts\sql\01_overview.sql
+```
+
+Файлы также можно открыть в pgAdmin, DBeaver или Adminer и выполнить целиком.
+Запросы начинаются с `SET search_path TO main;`; при другой схеме поправьте
+эту строку. Подробное описание полей и того, что считать заглушкой, — в
+`scripts/sql/README.md`.
+
+При сборке app-image каталог `scripts` копируется целиком, поэтому запросы
+окажутся и в `%USERPROFILE%\Desktop\AnimeQuiz\scripts\sql`.
 
 ## Структура проекта
 
@@ -342,7 +372,8 @@ src/main/resources/
 ├── templates/      Thymeleaf-шаблоны
 └── application.properties
 
-scripts/            резервное копирование и восстановление (Windows)
+scripts/backup/     резервное копирование и восстановление (Windows)
+scripts/sql/        SQL-запросы для мониторинга базы
 ```
 
 ## Диагностика
@@ -354,6 +385,7 @@ scripts/            резервное копирование и восстан�
 | Flyway: `Detected applied migration not resolved locally` | версия приложения старше базы; используйте совместимый jar или дамп |
 | `mvn package` падает на `jpackage` | добавьте `anime-logo.ico` в корень или запустите `mvn package -Dexec.skip=true` |
 | `pg_dump not found` | установите PostgreSQL client tools или задайте `ANIMEQUIZ_PG_BIN` |
+| Нужно понять, сколько в каталоге заглушек и ошибок | выполните `scripts\sql\01_overview.sql`, список заглушек — `04_stubs.sql` |
 | Задача планировщика не выполняется | проверьте `Get-ScheduledTaskInfo`; режим `Interactive` требует входа в Windows |
 | Кириллица в логах выглядит битой | откройте файл в редакторе с UTF-8, смените кодировку консоли на UTF-8 |
 

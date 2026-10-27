@@ -97,7 +97,7 @@ function Resolve-PgPassFile {
 function Set-PgEnvironment {
     $pgpass = Resolve-PgPassFile
     if (-not (Test-Path -LiteralPath $pgpass)) {
-        throw "pgpass file not found: $pgpass. Run scripts\setup-pgpass.ps1 first."
+        throw "pgpass file not found: $pgpass. Run scripts\backup\setup-pgpass.ps1 first."
     }
     $env:PGPASSFILE = $pgpass
     $env:PGCLIENTENCODING = 'UTF8'

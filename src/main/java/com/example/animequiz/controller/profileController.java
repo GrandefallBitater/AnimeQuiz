@@ -5,6 +5,7 @@ import com.example.animequiz.repository.UserRepository;
 import com.example.animequiz.service.*;
 import com.example.animequiz.service.enrichment.EnrichmentWorker;
 import com.example.animequiz.service.importer.AnimeListImporter;
+import com.example.animequiz.validation.InputValidation;
 import java.util.stream.Collectors;
 
 import jakarta.servlet.http.Cookie;
@@ -27,6 +28,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -130,10 +134,13 @@ public class profileController {
             return ResponseEntity.ok(resp);
 
         } catch (Exception e) {
-            log.error("Импорт не удался (source={}, nickname={})", source, nickname, e);
+            String errorMessage = e.getMessage() != null
+                    ? InputValidation.forLog(e.getMessage())
+                    : e.getClass().getSimpleName();
+            log.error("Импорт не удался (source={}, nickname={}): {}",
+                    source, InputValidation.forLog(nickname), errorMessage, e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", e.getMessage() != null
-                            ? e.getMessage() : e.getClass().getSimpleName()));
+                    .body(Map.of("message", errorMessage));
         } finally {
             activeImports.finish(username);
         }
@@ -194,9 +201,11 @@ public class profileController {
 
     private String executeNameUpdate(String userName, Authentication auth,
                                      HttpServletResponse response, HttpServletRequest request) {
-        String clean = userName == null ? "" : userName.trim();
-        if (clean.isEmpty()) {
-            return "Имя не может быть пустым";
+        final String clean;
+        try {
+            clean = InputValidation.normalizeDisplayName(userName);
+        } catch (IllegalArgumentException e) {
+            return e.getMessage();
         }
 
         if (AuthService.isAuthenticated(auth)) {
@@ -211,7 +220,7 @@ public class profileController {
                 authService.updateSecurityContext(newAuth, request);
             }
         } else {
-            Cookie cookie = new Cookie(NAME_COOKIE, clean);
+            Cookie cookie = new Cookie(NAME_COOKIE, URLEncoder.encode(clean, StandardCharsets.UTF_8));
             cookie.setMaxAge(7 * 24 * 60 * 60);
             cookie.setPath("/");
             cookie.setHttpOnly(true);
@@ -295,7 +304,14 @@ public class profileController {
                     .orElse(auth.getName());
         }
         String custom = readCookie(request, NAME_COOKIE);
-        return (custom != null && !custom.isBlank()) ? custom : "guest";
+        if (custom == null || custom.isBlank()) {
+            return "guest";
+        }
+        try {
+            return URLDecoder.decode(custom, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            return custom;
+        }
     }
 
     private static String readCookie(HttpServletRequest request, String name) {

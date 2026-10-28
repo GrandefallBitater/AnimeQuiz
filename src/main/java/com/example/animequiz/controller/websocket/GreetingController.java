@@ -1,12 +1,12 @@
 package com.example.animequiz.controller.websocket;
 
 import com.example.animequiz.entity.greetingsDTO;
+import com.example.animequiz.validation.InputValidation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.util.HtmlUtils;
 
 @Controller
 @Slf4j
@@ -14,10 +14,19 @@ public class GreetingController {
 
     @MessageMapping("/hello")
     @SendTo("/game/greetings")
-    public greetingsDTO greeting(greetingsDTO message) throws Exception {
-        greetingsDTO greetingsDTO1 = new greetingsDTO("hi " +  HtmlUtils.htmlEscape(message.getName()));
-        log.info(greetingsDTO1.getName());
-        return greetingsDTO1;
+    public greetingsDTO greeting(greetingsDTO message) {
+        String rawName = message == null ? null : message.getName();
+
+        String name;
+        try {
+            name = InputValidation.normalizeLobbyName(rawName);
+        } catch (IllegalArgumentException e) {
+            name = "guest";
+        }
+
+        greetingsDTO response = new greetingsDTO("hi " + name);
+        log.info("{}", response.getName());
+        return response;
     }
 
     @GetMapping("/lobby")

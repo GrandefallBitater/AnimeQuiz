@@ -3,7 +3,7 @@ $(document).ready(function () {
         const $container = $('#toastContainer');
         const $toast = $('<div>')
             .addClass(`toast toast-${type}`)
-            .html(message);
+            .text(message == null ? '' : String(message));
 
         $container.append($toast);
 

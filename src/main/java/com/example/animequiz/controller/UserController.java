@@ -6,6 +6,7 @@ import com.example.animequiz.service.AuthService;
 import com.example.animequiz.service.StorageService;
 import com.example.animequiz.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.annotation.Secured;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Controller
+@Slf4j
 public class UserController {
 
     private final UserService userService;
@@ -180,8 +182,11 @@ public class UserController {
                     "message", message,
                     "isSelfUpdate", isSelfUpdate
             );
+        } catch (IllegalArgumentException e) {
+            return Map.of("message", e.getMessage(), "success", false);
         } catch (Exception e) {
-            return Map.of("message", "Ошибка при обновлении: " + e.getMessage(), "success", false);
+            log.error("Не удалось обновить пользователя", e);
+            return Map.of("message", "Не удалось обновить пользователя", "success", false);
         }
     }
 

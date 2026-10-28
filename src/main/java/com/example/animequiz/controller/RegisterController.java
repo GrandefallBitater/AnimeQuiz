@@ -1,12 +1,15 @@
 package com.example.animequiz.controller;
 
 import com.example.animequiz.service.UserService;
+import com.example.animequiz.validation.InputValidation;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/auth")
 public class RegisterController {
@@ -32,8 +35,15 @@ public class RegisterController {
             return ResponseEntity.badRequest()
                     .body(Map.of("message", "Пароль должен быть не короче 6 символов"));
         }
+
+        final String cleanUsername;
         try {
-            String cleanUsername = username.trim();
+            cleanUsername = InputValidation.normalizeUsername(username);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+
+        try {
             UserController.UserRequest userRequest = new UserController.UserRequest(
                     cleanUsername,
                     cleanUsername,
@@ -48,8 +58,9 @@ public class RegisterController {
             }
             return ResponseEntity.ok(Map.of("message", "Аккаунт создан! Теперь войдите"));
         } catch (Exception e) {
+            log.error("Не удалось зарегистрировать пользователя {}", InputValidation.forLog(cleanUsername), e);
             return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Ошибка при регистрации: " + e.getMessage()));
+                    .body(Map.of("message", "Не удалось зарегистрироваться. Попробуйте позже"));
         }
     }
 }

@@ -8,7 +8,14 @@ stompClient.onConnect = (frame) => {
     setConnected(true);
     console.log('Connected: ' + frame);
     stompClient.subscribe('/game/greetings', (greeting) => {
-        showGreeting(JSON.parse(greeting.body).name);
+        let name = '';
+        try {
+            const data = JSON.parse(greeting.body);
+            name = data && data.name != null ? String(data.name) : '';
+        } catch (e) {
+            console.warn('Некорректное сообщение лобби', e);
+        }
+        showGreeting(name);
     });
 };
 
@@ -30,7 +37,7 @@ function setConnected(connected) {
     else {
         $("#conversation").hide();
     }
-    $("#greetings").html("");
+    $("#greetings").empty();
 }
 
 function connect() {
@@ -44,14 +51,17 @@ function disconnect() {
 }
 
 function sendName() {
+    const name = String($("#name").val() || '').trim().slice(0, 32);
+    if (!name) return;
     stompClient.publish({
         destination: "/gameResponse/hello",
-        body: JSON.stringify({'name': $("#name").val()})
+        body: JSON.stringify({'name': name})
     });
 }
 
 function showGreeting(message) {
-    $("#greetings").append("<tr><td>" + message + "</td></tr>");
+    const text = message == null ? '' : String(message);
+    $("#greetings").append($('<tr>').append($('<td>').text(text)));
 }
 
 $(function () {

@@ -3,6 +3,19 @@ $(document).ready(function () {
     const statusNames = { enabled: 'Включён', disabled: 'Отключён' };
     const defaultLogoUrl = '/server-images/anime-logo.png';
 
+    function safeUrl(value, fallback) {
+        const raw = (value == null ? '' : String(value)).trim();
+        if (!raw) return fallback;
+        try {
+            const parsed = new URL(raw, window.location.origin);
+            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                return parsed.href;
+            }
+        } catch (e) {
+        }
+        return fallback;
+    }
+
     let users = [];
     let editingId = null;
     let pendingDeleteId = null;
@@ -53,10 +66,10 @@ $(document).ready(function () {
             }
 
             if ($adminRoleBadge.length && admin.role) {
-                const readableRole = roleNames[admin.role] || admin.role;
+                const role = roleNames[admin.role] ? admin.role : 'USER';
                 $adminRoleBadge
-                    .text(readableRole)
-                    .attr('class', 'role-badge role-' + admin.role.toLowerCase());
+                    .text(roleNames[role])
+                    .attr('class', 'role-badge role-' + role.toLowerCase());
             }
 
             if ($adminStatusField.length && admin.enabled !== undefined) {
@@ -67,13 +80,14 @@ $(document).ready(function () {
             }
 
             if ($adminAvatarField.length) {
+                const avatarUrl = safeUrl(admin.avatarUrl, defaultLogoUrl);
                 if ($adminAvatarField.is('img')) {
-                    $adminAvatarField.attr('src', admin.avatarUrl);
+                    $adminAvatarField.attr('src', avatarUrl);
                 } else {
                     $adminAvatarField
                         .text('')
                         .css({
-                            'background-image': 'url(' + admin.avatarUrl + ')',
+                            'background-image': 'url("' + avatarUrl.replace(/"/g, '%22') + '")',
                             'background-size': 'cover',
                             'background-position': 'center',
                             'background-repeat': 'no-repeat'
@@ -110,42 +124,69 @@ $(document).ready(function () {
 
     function renderUsers(list) {
         $usersCount.text(users.length);
+        $tbody.empty();
 
         if (!list.length) {
-            $tbody.html('<tr><td colspan="4" class="empty-row">😔 Ничего не найдено</td></tr>');
+            $tbody.append(
+                $('<tr>').append(
+                    $('<td>').attr('colspan', 4).addClass('empty-row').text('😔 Ничего не найдено')
+                )
+            );
             return;
         }
 
-        const rows = list.map(u => `
-            <tr>
-                <td>
-                    <div class="table-user">
-                        <div class="table-avatar">
-                            <img src="${u.avatar}"
-                                 alt="avatar"
-                                 style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"
-                                 onerror="this.onerror=null; this.src='${defaultLogoUrl}';" />
-                        </div>
-                        <div>
-                            <div class="table-nick">${u.nick}</div>
-                            <div class="table-id">${u.id}</div>
-                        </div>
-                    </div>
-                </td>
-                <td><span class="role-badge role-${u.role}">${roleNames[u.role]}</span></td>
-                <td>
-                    <span class="status-badge status-${u.status}">
-                        <span class="status-dot"></span>${statusNames[u.status]}
-                    </span>
-                </td>
-                <td class="td-actions">
-                    <button class="icon-btn edit-btn"   data-action="edit"   data-id="${u.id}" title="Редактировать">✏️</button>
-                    <button class="icon-btn delete-btn" data-action="delete" data-id="${u.id}" title="Удалить">🗑️</button>
-                </td>
-            </tr>
-        `).join('');
+        list.forEach(function (u) {
+            const avatarUrl = safeUrl(u.avatar, defaultLogoUrl);
+            const role = roleNames[u.role] ? u.role : 'USER';
+            const status = u.status === 'disabled' ? 'disabled' : 'enabled';
 
-        $tbody.html(rows);
+            const $avatar = $('<img>')
+                .attr({ src: avatarUrl, alt: 'avatar' })
+                .css({
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    borderRadius: '50%'
+                })
+                .on('error', function () {
+                    this.onerror = null;
+                    this.src = defaultLogoUrl;
+                });
+
+            const $userCell = $('<td>').append(
+                $('<div>').addClass('table-user').append(
+                    $('<div>').addClass('table-avatar').append($avatar),
+                    $('<div>').append(
+                        $('<div>').addClass('table-nick').text(u.nick),
+                        $('<div>').addClass('table-id').text(u.id)
+                    )
+                )
+            );
+
+            const $roleCell = $('<td>').append(
+                $('<span>').addClass('role-badge role-' + role).text(roleNames[role])
+            );
+
+            const $statusCell = $('<td>').append(
+                $('<span>').addClass('status-badge status-' + status).append(
+                    $('<span>').addClass('status-dot'),
+                    document.createTextNode(statusNames[status])
+                )
+            );
+
+            const $actions = $('<td>').addClass('td-actions').append(
+                $('<button>')
+                    .addClass('icon-btn edit-btn')
+                    .attr({ 'data-action': 'edit', 'data-id': u.id, title: 'Редактировать' })
+                    .text('✏️'),
+                $('<button>')
+                    .addClass('icon-btn delete-btn')
+                    .attr({ 'data-action': 'delete', 'data-id': u.id, title: 'Удалить' })
+                    .text('🗑️')
+            );
+
+            $tbody.append($('<tr>').append($userCell, $roleCell, $statusCell, $actions));
+        });
     }
 
     function applyFilter() {

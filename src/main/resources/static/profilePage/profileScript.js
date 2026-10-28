@@ -181,8 +181,9 @@ $(document).ready(function () {
     }
 
     function posterOf(t) {
-        if (t.posterHash && t.posterExt) {
-            return '/media/posters/' + t.posterHash + '.' + t.posterExt;
+        const ext = String(t.posterExt || '').toLowerCase();
+        if (t.posterHash && /^(png|jpe?g|gif|webp)$/.test(ext)) {
+            return '/media/posters/' + encodeURIComponent(t.posterHash) + '.' + ext;
         }
         return FALLBACK_POSTER;
     }
@@ -207,10 +208,10 @@ $(document).ready(function () {
     function cardHtml(t) {
         const title  = escapeHtml(titleOf(t));
         const poster = escapeAttr(posterOf(t));
-        const url    = escapeAttr(t.url || '#');
+        const url    = escapeAttr(safeHttpUrl(t.url));
         const score  = t.score | 0;
-        const status = t.status || '';
-        const kind   = (t.kind || '').toUpperCase();
+        const status = STATUS_NAMES[t.status] ? t.status : '';
+        const kind   = escapeHtml((t.kind || '').toUpperCase());
         const total  = t.totalEpisodes | 0;
         const watched = t.episodesWatched | 0;
 
@@ -242,6 +243,19 @@ $(document).ready(function () {
         }[c]));
     }
     function escapeAttr(s) { return escapeHtml(s); }
+
+    function safeHttpUrl(value) {
+        const raw = (value == null ? '' : String(value)).trim();
+        if (!raw) return '#';
+        try {
+            const parsed = new URL(raw, window.location.origin);
+            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                return parsed.href;
+            }
+        } catch (e) {
+        }
+        return '#';
+    }
 
     function formatImportedAt(iso) {
         if (!iso) return '—';

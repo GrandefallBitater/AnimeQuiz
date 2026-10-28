@@ -192,6 +192,7 @@ $(document).ready(function () {
         if (!filtered.length) {
             $grid.empty();
             $empty.show();
+            $titlesEmpty.addClass('hidden');
             $loadMore.hide();
             $statShown.text(0);
             return;
@@ -208,7 +209,7 @@ $(document).ready(function () {
     function cardHtml(t) {
         const title  = escapeHtml(titleOf(t));
         const poster = escapeAttr(posterOf(t));
-        const url    = escapeAttr(safeHttpUrl(t.url));
+        const url    = escapeAttr(safeHttpUrl(stripYummyId(t.url)));
         const score  = t.score | 0;
         const status = STATUS_NAMES[t.status] ? t.status : '';
         const kind   = escapeHtml((t.kind || '').toUpperCase());
@@ -235,6 +236,25 @@ $(document).ready(function () {
                     <div class="an-card-meta">${kindHtml}${epsHtml}</div>
                 </div>
             </a>`;
+    }
+
+    function stripYummyId(value) {
+        const raw = (value == null ? '' : String(value)).trim();
+        if (!raw) return raw;
+
+        try {
+            const parsed = new URL(raw, window.location.origin);
+            if (!/^(www\.)?yummyani\.me$/i.test(parsed.hostname)) return raw;
+
+            const match = parsed.pathname.match(/^(\/catalog\/item\/.+)-\d+\/?$/);
+            if (match) {
+                parsed.pathname = match[1];
+                return parsed.href;
+            }
+            return raw;
+        } catch (e) {
+            return raw;
+        }
     }
 
     function escapeHtml(s) {

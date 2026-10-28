@@ -78,15 +78,24 @@ public class UserService {
     }
 
     @Transactional
-    public  String updateUser(@RequestBody UserController.UserRequest userDto, Boolean isSelfUpdate) {
-        User user = userRepository.findById(userDto.username())
+    public String updateSelfProfile(UserController.SelfUpdateRequest request) {
+        User user = userRepository.findById(request.username())
                 .orElseThrow(() -> new EntityNotFoundException("Пользователь не найден"));
 
-        user.setDisplayName(userDto.displayName());
-        user.setEnabled(userDto.enabled());
+        user.setDisplayName(request.displayName());
 
-        String roleName = userDto.role() != null ? userDto.role().toUpperCase() : "USER";
-        String targetAuthority = "ROLE_" + roleName;
+        return "Профиль обновлён";
+    }
+
+    @Transactional
+    public String updateUserByAdmin(UserController.AdminUpdateRequest request) {
+        User user = userRepository.findById(request.username())
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь не найден"));
+
+        user.setDisplayName(request.displayName());
+        user.setEnabled(request.enabled());
+
+        String targetAuthority = "ROLE_" + resolveRole(request.role());
 
         if (user.getAuthorities() == null) {
             user.setAuthorities(new ArrayList<>());
@@ -104,9 +113,9 @@ public class UserService {
 
             user.getAuthorities().add(authority);
         }
-        if(!isSelfUpdate) {
-            sessionService.expireUserSessions(userDto.username());
-        }
+
+        sessionService.expireUserSessions(request.username());
+
         return "Пользователь обновлён";
     }
 
@@ -118,11 +127,6 @@ public class UserService {
         }
     }
 
-    /**
-     * Оставляет только роли из белого списка; всё остальное (включая мусор
-     * и попытки подставить "ROLE_SUPERADMIN") превращается в USER.
-     * Вызывается только из createUser, доступного администратору.
-     */
     private static String resolveRole(String requestedRole) {
         if (requestedRole == null) {
             return "USER";

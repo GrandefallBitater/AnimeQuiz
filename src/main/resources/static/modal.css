@@ -283,6 +283,20 @@
 
 .modal-box .form-group select option { background: #1a1a3e; color: #e0e0e0; }
 
+.modal-box .form-group select:disabled,
+.modal-box .form-group input:disabled,
+.modal-box .form-group textarea:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    border-color: rgba(124, 58, 237, 0.12);
+}
+
+.modal-box .form-hint {
+    margin: -0.35rem 0 1rem;
+    font-size: 0.8rem;
+    color: #8b93a5;
+}
+
 .modal-box .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;

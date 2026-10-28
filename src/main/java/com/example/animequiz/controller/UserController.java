@@ -7,8 +7,10 @@ import com.example.animequiz.service.StorageService;
 import com.example.animequiz.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -137,12 +139,35 @@ public class UserController {
     public Map<String, Object> editUser(@RequestBody UserRequest userDto,
                                         Authentication currentAuth,
                                         HttpServletRequest request) {
-        String message;
-        boolean isSelfUpdate = false;
+        if (currentAuth == null
+                || !currentAuth.isAuthenticated()
+                || currentAuth instanceof AnonymousAuthenticationToken) {
+            throw new AccessDeniedException("Требуется аутентификация");
+        }
+
+        boolean isAdmin = currentAuth.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+        boolean isSelfUpdate = currentAuth.getName().equals(userDto.username());
+
+        if (!isAdmin && !isSelfUpdate) {
+            throw new AccessDeniedException("Недостаточно прав");
+        }
 
         try {
-            if (currentAuth != null && currentAuth.getName().equals(userDto.username())) {
-                message = userService.updateUser(userDto, isSelfUpdate);
+            String message;
+
+            if (isAdmin && !isSelfUpdate) {
+                message = userService.updateUserByAdmin(new AdminUpdateRequest(
+                        userDto.username(),
+                        userDto.displayName(),
+                        userDto.enabled(),
+                        userDto.role()
+                ));
+            } else {
+                message = userService.updateSelfProfile(new SelfUpdateRequest(
+                        userDto.username(),
+                        userDto.displayName()
+                ));
 
                 userService.getUser(userDto.username()).ifPresent(user -> {
                     UsernamePasswordAuthenticationToken newAuth =
@@ -150,17 +175,19 @@ public class UserController {
                     authService.updateSecurityContext(newAuth, request);
                 });
             }
-            else {
-                message = userService.updateUser(userDto, isSelfUpdate);
-            }
+
+            return Map.of(
+                    "message", message,
+                    "isSelfUpdate", isSelfUpdate
+            );
         } catch (Exception e) {
             return Map.of("message", "Ошибка при обновлении: " + e.getMessage(), "success", false);
         }
-        return Map.of(
-                "message", message,
-                "isSelfUpdate", isSelfUpdate
-        );
     }
 
     public record UserRequest(String username, String displayName, boolean enabled, String role, String password, String avatarUrl) {}
+
+    public record SelfUpdateRequest(String username, String displayName) {}
+
+    public record AdminUpdateRequest(String username, String displayName, boolean enabled, String role) {}
 }

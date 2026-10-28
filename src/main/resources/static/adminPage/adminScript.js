@@ -7,6 +7,7 @@ $(document).ready(function () {
     let editingId = null;
     let pendingDeleteId = null;
     let searchQuery = '';
+    let currentAdminUsername = null;
 
     const $tbody = $('#usersTableBody');
     const $usersCount = $('#usersCount');
@@ -44,6 +45,8 @@ $(document).ready(function () {
             dataType: 'json'
         }).done(function (admin) {
             if (!admin.authenticated) return;
+
+            currentAdminUsername = admin.username || null;
 
             if ($adminNameField.length) {
                 $adminNameField.text(admin.displayName);
@@ -156,10 +159,26 @@ $(document).ready(function () {
         applyFilter();
     });
 
+    function applySelfEditLocks(isSelf) {
+        $fRole.prop('disabled', isSelf);
+        $fStatus.prop('disabled', isSelf);
+
+        if (isSelf) {
+            $fRole.attr('title', 'Нельзя изменить собственную роль');
+            $fStatus.attr('title', 'Нельзя изменить собственный статус');
+        } else {
+            $fRole.removeAttr('title');
+            $fStatus.removeAttr('title');
+        }
+
+        $('#selfEditHint').prop('hidden', !isSelf);
+    }
+
     function openCreateModal() {
         editingId = null;
         $userForm[0].reset();
         $passRow.show();
+        applySelfEditLocks(false);
         $userModalTitle.text('Создание пользователя');
         $submitUserBtn.text('Создать');
         Modal.open($userModal);
@@ -173,6 +192,7 @@ $(document).ready(function () {
         $fNick.val(u.nick);
         $fRole.val(u.role);
         $fStatus.val(u.status);
+        applySelfEditLocks(currentAdminUsername !== null && id === currentAdminUsername);
         $userModalTitle.text('Редактирование пользователя');
         $submitUserBtn.text('Сохранить изменения');
         Modal.open($userModal);

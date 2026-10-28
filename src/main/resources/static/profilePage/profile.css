@@ -661,7 +661,7 @@ input[type="file"]::file-selector-button:hover {
     display: block;
 }
 
-.shikimori-info > div:last-child {
+.shikimori-text {
     flex: 1;
     min-width: 0;
     text-align: left !important;
@@ -685,7 +685,9 @@ input[type="file"]::file-selector-button:hover {
 .sync-status {
     display: inline-flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.4rem;
+    max-width: 100%;
     font-size: 0.8rem;
     color: #8888aa;
     background: rgba(13, 13, 26, 0.6);
@@ -704,6 +706,10 @@ input[type="file"]::file-selector-button:hover {
 .sync-status b {
     color: #d4a5ff;
     font-weight: 600;
+}
+
+.import-tab-pane .sync-status {
+    margin-bottom: 1rem;
 }
 
 .import-form {
@@ -739,6 +745,7 @@ input[type="file"]::file-selector-button:hover {
 
 @media (max-width: 768px) {
     .import-form { min-width: 100%; }
+    .shikimori-info { flex-direction: column; }
     .import-row { flex-direction: column; }
     .import-row .form-input,
     .import-row .btn-main,

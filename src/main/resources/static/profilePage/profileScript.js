@@ -47,7 +47,7 @@ $(document).ready(function () {
 
     const $titlesPanel  = $('#titlesPanel');
     const $titlesEmpty  = $('#titlesEmpty');
-    const $lastImport   = $('#lastImport');
+    const $lastImports  = $('.js-last-import');
     const $summaryCount = $('#summaryTitlesCount');
 
     function ingestViews(data) {
@@ -61,7 +61,7 @@ $(document).ready(function () {
         $statLocal.text(titles.filter(hasPoster).length);
         $statSource.text(data.source || 'shikimori');
         $statImported.text(formatImportedAt(data.importedAt));
-        $lastImport.text(formatImportedAt(data.importedAt));
+        $lastImports.text(formatImportedAt(data.importedAt));
         $summaryCount.text(total);
 
         if (hidden > 0) {

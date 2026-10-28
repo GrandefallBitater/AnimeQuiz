@@ -13,10 +13,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class UserService {
+
+    private static final Set<String> ALLOWED_ROLES = Set.of("USER", "ADMIN");
 
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
@@ -58,8 +62,7 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(userDto.password()));
 
         Authority authority = new Authority();
-        String roleName = userDto.role() != null ? userDto.role().toUpperCase() : "USER";
-        authority.setAuthority("ROLE_" + roleName);
+        authority.setAuthority("ROLE_" + resolveRole(userDto.role()));
         authority.setUser(user);
         if (user.getAuthorities() == null) {
             user.setAuthorities(new ArrayList<>());
@@ -113,5 +116,21 @@ public class UserService {
         }catch (Exception e) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Оставляет только роли из белого списка; всё остальное (включая мусор
+     * и попытки подставить "ROLE_SUPERADMIN") превращается в USER.
+     * Вызывается только из createUser, доступного администратору.
+     */
+    private static String resolveRole(String requestedRole) {
+        if (requestedRole == null) {
+            return "USER";
+        }
+        String role = requestedRole.trim().toUpperCase(Locale.ROOT);
+        if (role.startsWith("ROLE_")) {
+            role = role.substring("ROLE_".length());
+        }
+        return ALLOWED_ROLES.contains(role) ? role : "USER";
     }
 }

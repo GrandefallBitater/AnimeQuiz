@@ -120,7 +120,7 @@ public class UserController {
 
     @ResponseBody
     @PostMapping("/createUser")
-    @PreAuthorize("!hasRole('ADMIN') or !hasRole('User')")
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, String> createUser(@RequestBody UserRequest userDto) {
         String response;
         try {

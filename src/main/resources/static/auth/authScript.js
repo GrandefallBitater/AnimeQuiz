@@ -81,7 +81,7 @@ $(document).ready(function () {
                     }
                     showToast(msg, 'error');
                     $registerBtn.prop('disabled', false);
-                    $registerBtn.html('<span>Создать аккаунт</span><span>✨</span>');
+                    $registerBtn.html('<span>Создать аккаунт</span>');
                 });
         });
     }
@@ -96,5 +96,17 @@ $(document).ready(function () {
             });
             setTimeout(function () { $alert.remove(); }, 500);
         }, 5000);
+    });
+
+    $('.password-toggle').on('click', function () {
+        const $btn = $(this);
+        const $input = $btn.closest('.password-wrap').find('.form-input');
+        const show = $input.attr('type') === 'password';
+
+        $input.attr('type', show ? 'text' : 'password');
+        $btn.toggleClass('is-visible', show)
+            .attr('aria-pressed', show ? 'true' : 'false')
+            .attr('aria-label', show ? 'Скрыть пароль' : 'Показать пароль')
+            .attr('title', show ? 'Скрыть пароль' : 'Показать пароль');
     });
 });

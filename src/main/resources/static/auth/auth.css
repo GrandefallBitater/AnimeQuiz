@@ -149,6 +149,49 @@ body {
 
 .form-input::placeholder { color: #66668a; }
 
+.password-wrap {
+    position: relative;
+}
+
+.password-wrap .form-input {
+    padding-right: 3.25rem;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.5rem;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #8b8bb0;
+    cursor: pointer;
+    transition: color 0.2s ease, background 0.2s ease;
+}
+
+.password-toggle:hover {
+    color: #e0e0e0;
+    background: rgba(124, 58, 237, 0.15);
+}
+
+.password-toggle:focus-visible {
+    outline: 2px solid #a855f7;
+    outline-offset: 2px;
+}
+
+.password-toggle .lock-open { display: none; }
+
+.password-toggle.is-visible .lock-closed { display: none; }
+
+.password-toggle.is-visible .lock-open { display: block; }
+
 .form-input-icon {
     position: absolute;
     left: 1rem;

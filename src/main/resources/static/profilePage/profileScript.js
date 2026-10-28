@@ -19,13 +19,13 @@ $(document).ready(function () {
         dropped:    'Брошено'
     };
     const STATUS_ORDER = ['watching','rewatching','planned','completed','on_hold','dropped'];
+    const ACTIVE_STATUSES = [];
 
     let allTitles    = [];
     let filtered     = [];
     let currentPage  = 1;
     let searchQuery  = '';
     let sortMode     = 'default';
-    let statusFilter = '';
     let onlyLocal    = true;
     let viewMode     = 'grid';
 
@@ -96,14 +96,16 @@ $(document).ready(function () {
             counts[s] = (counts[s] || 0) + 1;
         });
 
+        const allActive = ACTIVE_STATUSES.length === 0;
+
         let html = `
-            <button type="button" class="an-status-pill ${statusFilter === '' ? 'is-active' : ''}"
+            <button type="button" class="an-status-pill ${allActive ? 'is-active' : ''}"
                     data-status="">Все <b>${allTitles.length}</b></button>`;
 
         STATUS_ORDER.forEach(key => {
             const count = counts[key] || 0;
             if (count === 0) return;
-            const active = statusFilter === key ? 'is-active' : '';
+            const active = ACTIVE_STATUSES.includes(key) ? 'is-active' : '';
             html += `<button type="button" class="an-status-pill ${active}" data-status="${key}">
                         ${STATUS_NAMES[key]} <b>${count}</b>
                      </button>`;
@@ -116,7 +118,7 @@ $(document).ready(function () {
         const q = searchQuery.trim().toLowerCase();
 
         filtered = allTitles.filter(t => {
-            if (statusFilter && (t.status || '') !== statusFilter) return false;
+            if (ACTIVE_STATUSES.length && !ACTIVE_STATUSES.includes(t.status || '')) return false;
             if (onlyLocal && !hasPoster(t)) return false;
             if (!q) return true;
 
@@ -437,11 +439,16 @@ $(document).ready(function () {
 
         $statusStats.on('click', '.an-status-pill', function () {
             const newStatus = String($(this).data('status') || '');
-            statusFilter = (statusFilter === newStatus) ? '' : newStatus;
-            $statusStats.find('.an-status-pill').each(function () {
-                $(this).toggleClass('is-active',
-                    String($(this).data('status') || '') === statusFilter);
-            });
+
+            if (!newStatus) {
+                ACTIVE_STATUSES.length = 0;
+            } else {
+                const i = ACTIVE_STATUSES.indexOf(newStatus);
+                if (i === -1) ACTIVE_STATUSES.push(newStatus);
+                else ACTIVE_STATUSES.splice(i, 1);
+            }
+
+            renderStatusCounters();
             applyFilters();
         });
 

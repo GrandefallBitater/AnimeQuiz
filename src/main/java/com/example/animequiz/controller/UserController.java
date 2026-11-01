@@ -113,26 +113,16 @@ public class UserController {
     @PreAuthorize("(hasRole('ADMIN') and authentication.name != #request.username)" +
             " or (hasRole('USER') and authentication.name == #request.username)")
     public Map<String, String> deleteUser(@RequestBody UserRequest request) {
-        String response;
-        try {
-            response = userService.deleteUser(request.username);
-        } catch (Exception e){
-            return Map.of("message", e.getMessage());
-        }
-        return Map.of("message", response);
+        userService.deleteUser(request.username);
+        return Map.of("message", "Пользователь успешно удалён");
     }
 
     @ResponseBody
     @PostMapping("/createUser")
     @PreAuthorize("hasRole('ADMIN')")
     public Map<String, String> createUser(@RequestBody UserRequest userDto) {
-        String response;
-        try {
-            response = userService.createUser(userDto);
-        } catch (Exception e){
-            return Map.of("message", e.getMessage());
-        }
-        return Map.of("message", response);
+        userService.createUser(userDto);
+        return Map.of("message", "Пользователь успешно создан");
     }
 
     @ResponseBody
@@ -155,44 +145,39 @@ public class UserController {
             throw new AccessDeniedException("Недостаточно прав");
         }
 
-        try {
-            String message;
+        if (isAdmin && !isSelfUpdate) {
+            userService.updateUserByAdmin(new AdminUpdateRequest(
+                    userDto.username(),
+                    userDto.displayName(),
+                    userDto.enabled(),
+                    userDto.role()
+            ));
+        } else {
+            userService.updateSelfProfile(new SelfUpdateRequest(
+                    userDto.username(),
+                    userDto.displayName()
+            ));
 
-            if (isAdmin && !isSelfUpdate) {
-                message = userService.updateUserByAdmin(new AdminUpdateRequest(
-                        userDto.username(),
-                        userDto.displayName(),
-                        userDto.enabled(),
-                        userDto.role()
-                ));
-            } else {
-                message = userService.updateSelfProfile(new SelfUpdateRequest(
-                        userDto.username(),
-                        userDto.displayName()
-                ));
-
-                userService.getUser(userDto.username()).ifPresent(user -> {
-                    UsernamePasswordAuthenticationToken newAuth =
-                            authService.refreshAuthentication(currentAuth, user);
-                    authService.updateSecurityContext(newAuth, request);
-                });
-            }
-
-            return Map.of(
-                    "message", message,
-                    "isSelfUpdate", isSelfUpdate
-            );
-        } catch (IllegalArgumentException e) {
-            return Map.of("message", e.getMessage(), "success", false);
-        } catch (Exception e) {
-            log.error("Не удалось обновить пользователя", e);
-            return Map.of("message", "Не удалось обновить пользователя", "success", false);
+            userService.getUser(userDto.username()).ifPresent(user -> {
+                UsernamePasswordAuthenticationToken newAuth =
+                        authService.refreshAuthentication(currentAuth, user);
+                authService.updateSecurityContext(newAuth, request);
+            });
         }
+
+        return Map.of(
+                "message", "Пользователь обновлён",
+                "isSelfUpdate", isSelfUpdate
+        );
     }
 
-    public record UserRequest(String username, String displayName, boolean enabled, String role, String password, String avatarUrl) {}
+    public record UserRequest(String username, String displayName, boolean enabled, String role, String password,
+                              String avatarUrl) {
+    }
 
-    public record SelfUpdateRequest(String username, String displayName) {}
+    public record SelfUpdateRequest(String username, String displayName) {
+    }
 
-    public record AdminUpdateRequest(String username, String displayName, boolean enabled, String role) {}
+    public record AdminUpdateRequest(String username, String displayName, boolean enabled, String role) {
+    }
 }

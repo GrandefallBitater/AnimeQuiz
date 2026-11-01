@@ -1,5 +1,6 @@
 package com.example.animequiz.service;
 
+import com.example.animequiz.exceptions.InvalidInputException;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -21,7 +22,6 @@ public class StorageService {
     private static final Map<String, String> ALLOWED_IMAGE_TYPES = Map.of(
             "image/png", "png",
             "image/jpeg", "jpg",
-            "image/gif", "gif",
             "image/webp", "webp"
     );
     private static final long MAX_AVATAR_BYTES = 5L * 1024 * 1024;
@@ -57,14 +57,14 @@ public class StorageService {
 
     public void saveAvatar(String key, MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Файл не выбран");
+            throw new InvalidInputException("Файл не выбран");
         }
         if (file.getSize() > MAX_AVATAR_BYTES) {
-            throw new IllegalArgumentException("Файл слишком большой (макс. 5 МБ)");
+            throw new InvalidInputException("Файл слишком большой (макс. 5 МБ)");
         }
         String ext = ALLOWED_IMAGE_TYPES.get(file.getContentType());
         if (ext == null) {
-            throw new IllegalArgumentException("Недопустимый формат: разрешены PNG, JPEG, GIF, WEBP");
+            throw new InvalidInputException("Недопустимый формат: разрешены PNG, JPEG, WEBP");
         }
         String safe = sanitizeKey(key);
         ReentrantLock lock = lockFor("avatar:" + safe);

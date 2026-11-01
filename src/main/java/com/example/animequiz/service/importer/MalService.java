@@ -1,5 +1,8 @@
 package com.example.animequiz.service.importer;
 
+import com.example.animequiz.exceptions.ExternalServiceException;
+import com.example.animequiz.exceptions.InvalidInputException;
+import com.example.animequiz.exceptions.NotFoundException;
 import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.ratelimit.SourceRateLimiter;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -45,6 +48,9 @@ public class MalService implements AnimeListImporter {
                 .connectTimeout(Duration.ofSeconds(10))
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .build();
+        if (clientId == null || clientId.isBlank()) {
+            log.warn("MAL токен не настроен - сервис будет недоступен");
+        }
     }
 
     @Override public String sourceName() { return "myanimelist"; }
@@ -52,7 +58,7 @@ public class MalService implements AnimeListImporter {
     @Override
     public ImportResult importList(String nickname) {
         String clean = nickname == null ? "" : nickname.trim();
-        if (clean.isEmpty()) throw new IllegalArgumentException("Укажите никнейм на MyAnimeList");
+        if (clean.isEmpty()) throw new InvalidInputException("Укажите никнейм на MyAnimeList");
 
         List<RatingEntry> entries = new ArrayList<>();
         for (int page = 0; page < MAX_PAGES; page++) {
@@ -78,7 +84,7 @@ public class MalService implements AnimeListImporter {
             sleep(300);
         }
         if (entries.isEmpty()) {
-            throw new IllegalArgumentException(
+            throw new NotFoundException(
                     "Список \"" + clean + "\" пуст, скрыт или пользователь не найден");
         }
         log.info("MAL: {} → {} записей", clean, entries.size());
@@ -117,7 +123,7 @@ public class MalService implements AnimeListImporter {
         String url = apiBaseUrl + "/anime/" + malId
                 + "?fields=id,title,main_picture,alternative_titles,media_type,num_episodes,status";
         JsonNode root = getApiJson(url);
-        if (root == null) throw new RuntimeException("MAL не знает " + malId);
+        if (root == null) throw new NotFoundException("MAL не знает " + malId);
 
         String poster = root.path("main_picture").path("large").asText(null);
         if (poster == null || poster.isBlank()) {

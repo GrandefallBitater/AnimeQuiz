@@ -16,6 +16,11 @@ $(document).ready(function () {
         return fallback;
     }
 
+    function requestError(xhr, fallback) {
+        const message = xhr && xhr.responseJSON && xhr.responseJSON.message;
+        return message || fallback;
+    }
+
     let users = [];
     let editingId = null;
     let pendingDeleteId = null;
@@ -117,7 +122,7 @@ $(document).ready(function () {
             })
             .fail(function (xhr) {
                 console.error('Ошибка загрузки пользователей:', xhr);
-                showToast('Не удалось загрузить список пользователей', 'error');
+                showToast(requestError(xhr, 'Не удалось загрузить список пользователей'), 'error');
                 renderUsers([]);
             });
     }
@@ -300,7 +305,7 @@ $(document).ready(function () {
                 })
                 .fail(function (xhr) {
                     console.error(xhr);
-                    showToast('Ошибка запроса', 'error');
+                    showToast(requestError(xhr, 'Не удалось создать пользователя'), 'error');
                 });
         } else {
             $.ajax({
@@ -329,7 +334,7 @@ $(document).ready(function () {
                 })
                 .fail(function (xhr) {
                     console.error(xhr);
-                    showToast('Ошибка запроса', 'error');
+                    showToast(requestError(xhr, 'Не удалось сохранить пользователя'), 'error');
                 });
         }
 
@@ -357,7 +362,7 @@ $(document).ready(function () {
             })
             .fail(function (xhr) {
                 console.error(xhr);
-                showToast('Ошибка запроса', 'error');
+                showToast(requestError(xhr, 'Не удалось удалить пользователя'), 'error');
             });
 
         pendingDeleteId = null;
@@ -442,8 +447,8 @@ $(document).ready(function () {
                 }
                 startPolling();
             })
-            .fail(function () {
-                showToast('Ошибка запуска импорта', 'error');
+            .fail(function (xhr) {
+                showToast(requestError(xhr, 'Не удалось запустить импорт'), 'error');
                 $btn.prop('disabled', false)
                     .html('<span class="btn-icon"></span><span class="btn-label">Загрузить</span>');
                 setProgressUI(false);
@@ -460,7 +465,7 @@ $(document).ready(function () {
             })
             .fail(function (xhr) {
                 console.error(xhr);
-                showToast('Ошибка запроса', 'error');
+                showToast(requestError(xhr, 'Не удалось получить дату обновления'), 'error');
             });
     }
 

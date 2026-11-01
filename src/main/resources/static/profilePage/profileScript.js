@@ -483,7 +483,8 @@ $(document).ready(function () {
         $('#avatarForm').on('submit', function (e) {
             e.preventDefault();
             const input = document.getElementById('avatarFile');
-            if (!input.files.length) { showToast('Файл не выбран', 'error'); return; }
+            const fileError = avatarFileError(input.files && input.files[0]);
+            if (fileError) { showToast(fileError, 'error'); return; }
 
             const fd = new FormData();
             fd.append('avatar', input.files[0]);

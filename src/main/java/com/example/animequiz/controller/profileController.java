@@ -1,6 +1,7 @@
 package com.example.animequiz.controller;
 
 import com.example.animequiz.entity.User;
+import com.example.animequiz.exceptions.InvalidInputException;
 import com.example.animequiz.repository.UserRepository;
 import com.example.animequiz.service.*;
 import com.example.animequiz.service.enrichment.EnrichmentWorker;
@@ -133,14 +134,6 @@ public class profileController {
             resp.put("source", importer.sourceName());
             return ResponseEntity.ok(resp);
 
-        } catch (Exception e) {
-            String errorMessage = e.getMessage() != null
-                    ? InputValidation.forLog(e.getMessage())
-                    : e.getClass().getSimpleName();
-            log.error("Импорт не удался (source={}, nickname={}): {}",
-                    source, InputValidation.forLog(nickname), errorMessage, e);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", errorMessage));
         } finally {
             activeImports.finish(username);
         }
@@ -330,7 +323,7 @@ public class profileController {
         AnimeListImporter importer = importers.get(
                 source == null ? "shikimori" : source.toLowerCase());
         if (importer == null) {
-            throw new IllegalArgumentException("Неизвестный источник: " + source);
+            throw new InvalidInputException("Неизвестный источник: " + source);
         }
         return importer;
     }

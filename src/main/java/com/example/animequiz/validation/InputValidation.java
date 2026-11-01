@@ -1,5 +1,7 @@
 package com.example.animequiz.validation;
 
+import com.example.animequiz.exceptions.InvalidInputException;
+
 import java.util.regex.Pattern;
 
 public final class InputValidation {
@@ -20,10 +22,10 @@ public final class InputValidation {
     public static String normalizeUsername(String raw) {
         String value = raw == null ? "" : raw.trim();
         if (value.isEmpty()) {
-            throw new IllegalArgumentException("Никнейм не может быть пустым");
+            throw new InvalidInputException("Никнейм не может быть пустым");
         }
         if (!USERNAME.matcher(value).matches()) {
-            throw new IllegalArgumentException(
+            throw new InvalidInputException(
                     "Никнейм: от " + USERNAME_MIN + " до " + USERNAME_MAX
                             + " символов, только буквы, цифры, точка, дефис и подчёркивание");
         }
@@ -33,13 +35,13 @@ public final class InputValidation {
     public static String normalizeDisplayName(String raw) {
         String value = raw == null ? "" : raw.trim();
         if (value.isEmpty()) {
-            throw new IllegalArgumentException("Имя не может быть пустым");
+            throw new InvalidInputException("Имя не может быть пустым");
         }
         if (value.codePointCount(0, value.length()) > DISPLAY_NAME_MAX) {
-            throw new IllegalArgumentException("Имя не должно превышать " + DISPLAY_NAME_MAX + " символов");
+            throw new InvalidInputException("Имя не должно превышать " + DISPLAY_NAME_MAX + " символов");
         }
         if (FORBIDDEN_DISPLAY_CHARS.matcher(value).find()) {
-            throw new IllegalArgumentException("Имя содержит недопустимые символы");
+            throw new InvalidInputException("Имя содержит недопустимые символы");
         }
         return value;
     }
@@ -47,7 +49,7 @@ public final class InputValidation {
     public static String normalizeLobbyName(String raw) {
         String value = normalizeDisplayName(raw);
         if (value.codePointCount(0, value.length()) > LOBBY_NAME_MAX) {
-            throw new IllegalArgumentException("Имя не должно превышать " + LOBBY_NAME_MAX + " символов");
+            throw new InvalidInputException("Имя не должно превышать " + LOBBY_NAME_MAX + " символов");
         }
         return value;
     }

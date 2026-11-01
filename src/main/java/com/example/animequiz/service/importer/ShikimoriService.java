@@ -1,5 +1,8 @@
 package com.example.animequiz.service.importer;
 
+import com.example.animequiz.exceptions.ExternalServiceException;
+import com.example.animequiz.exceptions.InvalidInputException;
+import com.example.animequiz.exceptions.NotFoundException;
 import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.ratelimit.SourceRateLimiter;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -56,11 +59,11 @@ public class ShikimoriService implements AnimeListImporter {
     @Override
     public ImportResult importList(String nickname) {
         String clean = nickname == null ? "" : nickname.trim();
-        if (clean.isEmpty()) throw new IllegalArgumentException("Укажите никнейм на Shikimori");
+        if (clean.isEmpty()) throw new InvalidInputException("Укажите никнейм на Shikimori");
 
         JsonNode user = getJson("/users/" + enc(clean) + "?is_nickname=1");
         if (user == null || !user.hasNonNull("id")) {
-            throw new ShikimoriException("Пользователь \"" + clean + "\" не найден на Shikimori");
+            throw new NotFoundException("Пользователь \"" + clean + "\" не найден на Shikimori");
         }
         long userId = user.get("id").asLong();
         String resolvedNick = user.path("nickname").asText(clean);
@@ -109,7 +112,7 @@ public class ShikimoriService implements AnimeListImporter {
     public AnimeCatalogService.AnimePatch fetchFull(long shikimoriId) {
         JsonNode detail = getJson("/animes/" + shikimoriId);
         if (detail == null || detail.isMissingNode()) {
-            throw new ShikimoriNotFoundException("Shikimori не знает тайтл " + shikimoriId);
+            throw new NotFoundException("Shikimori не знает тайтл " + shikimoriId);
         }
         JsonNode imageNode = detail.path("image");
         String posterUrl = pickImageUrl(imageNode);
@@ -224,18 +227,22 @@ public class ShikimoriService implements AnimeListImporter {
                 if (code == 404) return null;
                 if (code == 429) { sleep(RETRY_DELAY_MS * attempt * 2L); continue; }
                 if (code >= 500) { sleep(RETRY_DELAY_MS * attempt); continue; }
-                if (code == 403) {throw new ShikimoriException("Аккаунт скрыт"); }
-                if (code != 200) throw new ShikimoriException("Shikimori ответил кодом " + code);
+                if (code == 403) {throw new NotFoundException("Аккаунт скрыт"); }
+                if (code != 200)  {
+                    log.error("Shikimori вернул ошибку. Статус: {}. URL: {}. Ответ: {}",
+                            resp.statusCode(), url, resp.body());
+                    throw new ExternalServiceException("Shikimori вернул ошибку");
+                }
                 return mapper.readTree(resp.body());
             } catch (IOException e) {
                 lastError = e;
                 sleep(RETRY_DELAY_MS * attempt);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new ShikimoriException("Импорт прерван", e);
+                throw new ExternalServiceException("Импорт прерван", e);
             }
         }
-        throw new ShikimoriException("Shikimori недоступен", lastError);
+        throw new ExternalServiceException("Shikimori недоступен", lastError);
     }
 
     private static String enc(String s) {
@@ -244,14 +251,5 @@ public class ShikimoriService implements AnimeListImporter {
 
     private static void sleep(long ms) {
         try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-    }
-
-    public static class ShikimoriException extends RuntimeException {
-        public ShikimoriException(String m) { super(m); }
-        public ShikimoriException(String m, Throwable c) { super(m, c); }
-    }
-
-    public static class ShikimoriNotFoundException extends ShikimoriException {
-        public ShikimoriNotFoundException(String m) { super(m); }
     }
 }

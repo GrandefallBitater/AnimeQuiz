@@ -1,9 +1,12 @@
 package com.example.animequiz.controller;
 
+import com.example.animequiz.exceptions.ConflictException;
+import com.example.animequiz.exceptions.InvalidInputException;
 import com.example.animequiz.service.UserService;
 import com.example.animequiz.validation.InputValidation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,41 +29,17 @@ public class RegisterController {
         String username = body.get("username");
         String password = body.get("password");
 
-        if (username == null || username.trim().isEmpty()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Никнейм не может быть пустым"));
-        }
+        final String cleanUsername = InputValidation.normalizeUsername(username);
 
-        if (password == null || password.length() < 6) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Пароль должен быть не короче 6 символов"));
-        }
-
-        final String cleanUsername;
-        try {
-            cleanUsername = InputValidation.normalizeUsername(username);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
-
-        try {
-            UserController.UserRequest userRequest = new UserController.UserRequest(
-                    cleanUsername,
-                    cleanUsername,
-                    true,
-                    "USER",
-                    password,
-                    null
-            );
-            String serviceResponse = userService.createUser(userRequest);
-            if (serviceResponse.startsWith("что-то пошло не так")) {
-                return ResponseEntity.badRequest().body(Map.of("message", serviceResponse));
-            }
-            return ResponseEntity.ok(Map.of("message", "Аккаунт создан! Теперь войдите"));
-        } catch (Exception e) {
-            log.error("Не удалось зарегистрировать пользователя {}", InputValidation.forLog(cleanUsername), e);
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Не удалось зарегистрироваться. Попробуйте позже"));
-        }
+        UserController.UserRequest userRequest = new UserController.UserRequest(
+                cleanUsername,
+                cleanUsername,
+                true,
+                "USER",
+                password,
+                null
+        );
+        userService.createUser(userRequest);
+        return ResponseEntity.ok(Map.of("message", "Аккаунт создан! Теперь войдите"));
     }
 }

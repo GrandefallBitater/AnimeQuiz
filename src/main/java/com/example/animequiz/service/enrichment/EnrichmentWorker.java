@@ -1,6 +1,7 @@
 package com.example.animequiz.service.enrichment;
 
 import com.example.animequiz.entity.Anime;
+import com.example.animequiz.exceptions.NotFoundException;
 import com.example.animequiz.repository.AnimeRepository;
 import com.example.animequiz.repository.ImportJobRepository;
 import com.example.animequiz.service.PosterStorageService;
@@ -89,7 +90,7 @@ public class EnrichmentWorker {
             try {
                 patch = shikimori.fetchFull(a.getShikimoriId());
                 sources.add("shikimori");
-            } catch (ShikimoriService.ShikimoriNotFoundException e) {
+            } catch (NotFoundException e) {
                 log.info("Shikimori 404 animeId={} shikiId={} — пропускаю",
                         a.getId(), a.getShikimoriId());
                 sources.add("shikimori");
@@ -108,7 +109,7 @@ public class EnrichmentWorker {
                 if (a.getYummyId() != null) {
                     try {
                         y = yummy.fetchFull(a.getYummyId());
-                    } catch (YummyAnimeService.YummyNotFoundException e) {
+                    } catch (NotFoundException e) {
                         log.info("Yummy 404 animeId={} yummyId={}", a.getId(), a.getYummyId());
                     } catch (Exception e) {
                         log.warn("Yummy fetchFull fail animeId={} yummyId={}: {}",

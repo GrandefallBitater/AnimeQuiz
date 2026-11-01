@@ -107,7 +107,7 @@ public class ImportJobService {
             finish(job, "Импорт завершён. Постеры догружаются в фоне.");
         } catch (Exception e) {
             log.error("Site import failed", e);
-            fail(job, e.getMessage());
+            fail(job, e.getClass().getSimpleName());
         }
     }
 

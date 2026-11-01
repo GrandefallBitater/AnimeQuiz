@@ -1,5 +1,15 @@
 // noinspection JSJQueryEfficiency
 
+// Лимит совпадает с spring.servlet.multipart.max-file-size в application.properties
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+const AVATAR_MAX_LABEL = '5 МБ';
+
+function avatarFileError(file) {
+    if (!file) return 'Выберите файл изображения';
+    if (file.size > AVATAR_MAX_BYTES) return 'Файл больше ' + AVATAR_MAX_LABEL;
+    return null;
+}
+
 $(document).ready(function () {
     const setCustomNamemodalHtml = `
 <div class="modal-overlay" id="setCustomNamemodal">
@@ -163,8 +173,9 @@ $(document).ready(function () {
         e.preventDefault();
 
         const fileInput = $('#favatar')[0];
-        if (!fileInput.files || !fileInput.files[0]) {
-            showToast('Выберите файл изображения', 'error');
+        const fileError = avatarFileError(fileInput.files && fileInput.files[0]);
+        if (fileError) {
+            showToast(fileError, 'error');
             return;
         }
 

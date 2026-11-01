@@ -3,15 +3,19 @@ package com.example.animequiz.service;
 import com.example.animequiz.controller.UserController;
 import com.example.animequiz.entity.Authority;
 import com.example.animequiz.entity.User;
+import com.example.animequiz.exceptions.ConflictException;
+import com.example.animequiz.exceptions.InvalidInputException;
+import com.example.animequiz.exceptions.NotFoundException;
 import com.example.animequiz.repository.UserRepository;
 import com.example.animequiz.validation.InputValidation;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -43,34 +47,29 @@ public class UserService {
         return userRepository.findAll();
     }
 
-    public String deleteUser(String username) {
+    public void deleteUser(String username) {
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+        userRepository.deleteById(user.getUsername());
+        String key = "u_" + username;
+        String sk = StorageService.sanitizeKey(key);
         try {
-            userRepository.deleteById(username);
-            String key = "u_" + username;
-            String sk = StorageService.sanitizeKey(key);
             storageService.deleteAvatar(sk);
-        } catch (Exception e) {
-            log.error("Не удалось удалить пользователя {}", InputValidation.forLog(username), e);
-            return "Не удалось удалить пользователя";
+        } catch (IOException e) {
+            log.warn("Удаление аватара прошло неудачно", e);
         }
-        return "удаление прошло успешно";
     }
 
-    public String createUser(UserController.UserRequest userDto) {
+    public void createUser(UserController.UserRequest userDto) {
         final String username;
         final String displayName;
 
-        try {
-            username = InputValidation.normalizeUsername(userDto.username());
-            String requestedDisplayName = userDto.displayName();
-            displayName = InputValidation.normalizeDisplayName(
-                    requestedDisplayName == null || requestedDisplayName.isBlank()
-                            ? username : requestedDisplayName);
-            if (userDto.password() == null || userDto.password().length() < 6) {
-                throw new IllegalArgumentException("Пароль должен быть не короче 6 символов");
-            }
-        } catch (IllegalArgumentException e) {
-            return "что-то пошло не так: " + e.getMessage();
+        username = InputValidation.normalizeUsername(userDto.username());
+        String requestedDisplayName = userDto.displayName();
+        displayName = InputValidation.normalizeDisplayName(
+                requestedDisplayName == null || requestedDisplayName.isBlank()
+                        ? username : requestedDisplayName);
+        if (userDto.password() == null || userDto.password().length() < 6) {
+            throw new InvalidInputException("Пароль должен быть не короче 6 символов");
         }
 
         User user = new User();
@@ -89,29 +88,25 @@ public class UserService {
         user.getAuthorities().add(authority);
 
         try {
-            userRepository.save(user);
-        } catch (Exception e) {
-            log.error("Не удалось создать пользователя {}", InputValidation.forLog(username), e);
-            return "что-то пошло не так: Не удалось создать пользователя";
+            userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException e) {
+            throw new ConflictException("Никнейм уже занят", e);
         }
-        return "пользователь успешно добавлен";
     }
 
     @Transactional
-    public String updateSelfProfile(UserController.SelfUpdateRequest request) {
+    public void updateSelfProfile(UserController.SelfUpdateRequest request) {
         User user = userRepository.findById(request.username())
-                .orElseThrow(() -> new EntityNotFoundException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         String displayName = InputValidation.normalizeDisplayName(request.displayName());
         user.setDisplayName(displayName);
-
-        return "Профиль обновлён";
     }
 
     @Transactional
-    public String updateUserByAdmin(UserController.AdminUpdateRequest request) {
+    public void updateUserByAdmin(UserController.AdminUpdateRequest request) {
         User user = userRepository.findById(request.username())
-                .orElseThrow(() -> new EntityNotFoundException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         String displayName = InputValidation.normalizeDisplayName(request.displayName());
         user.setDisplayName(displayName);
@@ -137,16 +132,10 @@ public class UserService {
         }
 
         sessionService.expireUserSessions(request.username());
-
-        return "Пользователь обновлён";
     }
 
     public Optional<User> getUser(String username) {
-        try {
-             return userRepository.findById(username);
-        }catch (Exception e) {
-            return Optional.empty();
-        }
+        return userRepository.findById(username);
     }
 
     private static String resolveRole(String requestedRole) {

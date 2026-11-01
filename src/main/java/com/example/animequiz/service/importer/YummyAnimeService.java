@@ -1,5 +1,8 @@
 package com.example.animequiz.service.importer;
 
+import com.example.animequiz.exceptions.ExternalServiceException;
+import com.example.animequiz.exceptions.InvalidInputException;
+import com.example.animequiz.exceptions.NotFoundException;
 import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.ratelimit.SourceRateLimiter;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -44,23 +47,26 @@ public class YummyAnimeService implements AnimeListImporter {
         this.baseUrl = baseUrl.replaceAll("/+$", "");
         this.appToken = appToken;
         if (appToken == null || appToken.isBlank()) {
-            log.warn("YummyAnime app-token не задан — импорт с YummyAnime работать не будет");
+            log.warn("YummyAnime token не настроен, сервис будет недоступен");
         }
     }
 
-    @Override public String sourceName() { return "yummy"; }
+    @Override
+    public String sourceName() {
+        return "yummy";
+    }
 
     @Override
     public ImportResult importList(String nickname) {
         String clean = nickname == null ? "" : nickname.trim();
-        if (clean.isEmpty()) throw new IllegalArgumentException("Укажите никнейм на YummyAnime");
+        if (clean.isEmpty()) throw new InvalidInputException("Укажите никнейм на YummyAnime");
 
         long userId = nickCache.computeIfAbsent(clean.toLowerCase(), k -> resolveUserId(clean));
 
         JsonNode root = getJson("/users/" + userId + "/lists");
         JsonNode arr = root.path("response");
         if (!arr.isArray() || arr.isEmpty()) {
-            throw new IllegalArgumentException(
+            throw new NotFoundException(
                     "Список \"" + clean + "\" пуст, скрыт или пользователь не найден");
         }
 
@@ -71,7 +77,7 @@ public class YummyAnimeService implements AnimeListImporter {
 
             JsonNode remote = item.path("remote_ids");
             Long shiki = longOrNull(remote, "shikimori_id");
-            Long mal   = longOrNull(remote, "myanimelist_id");
+            Long mal = longOrNull(remote, "myanimelist_id");
 
             JsonNode userListNode = item.path("user").path("list").path("list");
             int listId = userListNode.path("id").asInt(-1);
@@ -99,7 +105,7 @@ public class YummyAnimeService implements AnimeListImporter {
         JsonNode root = getJson("/anime/" + yummyId);
         JsonNode anime = root.path("response");
         if (anime.isMissingNode() || anime.isNull()) {
-            throw new YummyNotFoundException("YummyAnime не знает " + yummyId);
+            throw new NotFoundException("YummyAnime не знает " + yummyId);
         }
         return toPatch(anime);
     }
@@ -128,7 +134,7 @@ public class YummyAnimeService implements AnimeListImporter {
         long yummyId = anime.path("anime_id").asLong();
         JsonNode remote = anime.path("remote_ids");
         Long shiki = longOrNull(remote, "shikimori_id");
-        Long mal   = longOrNull(remote, "myanimelist_id");
+        Long mal = longOrNull(remote, "myanimelist_id");
 
         String poster = normalizeCdnUrl(anime.path("poster").path("fullsize").asText(null));
         String title = anime.path("title").asText(null);
@@ -165,7 +171,7 @@ public class YummyAnimeService implements AnimeListImporter {
         JsonNode root = getJson("/users/" + enc(nickname));
         JsonNode resp = root.path("response");
         if (!resp.hasNonNull("id")) {
-            throw new IllegalArgumentException("Пользователь \"" + nickname + "\" не найден на YummyAnime");
+            throw new NotFoundException("Пользователь \"" + nickname + "\" не найден на YummyAnime");
         }
         return resp.get("id").asLong();
     }
@@ -239,29 +245,25 @@ public class YummyAnimeService implements AnimeListImporter {
             HttpResponse<String> resp = http.send(req,
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (resp.statusCode() == 404) {
-                throw new RuntimeException("YummyAnime 404: " + url);
+                throw new NotFoundException("YummyAnime 404");
             }
             if (resp.statusCode() != 200) {
                 log.error("YummyAnime вернул ошибку. Статус: {}. URL: {}. Ответ: {}",
                         resp.statusCode(), url, resp.body());
-                throw new RuntimeException("YummyAnime HTTP " + resp.statusCode());
+                throw new ExternalServiceException("YummyAnime вернул ошибку");
             }
             return mapper.readTree(resp.body());
         } catch (IOException e) {
             log.error("YummyAnime IOException для URL: {}. Сообщение: {}. Причина: {}",
                     url, e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "нет", e);
-            throw new RuntimeException("YummyAnime недоступен: " + url, e);
+            throw new ExternalServiceException("YummyAnime недоступен", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
+            throw new ExternalServiceException("Импорт прерван", e);
         }
     }
 
     private static String enc(String s) {
         return URLEncoder.encode(s, StandardCharsets.UTF_8).replace("+", "%20");
-    }
-
-    public static class YummyNotFoundException extends RuntimeException {
-        public YummyNotFoundException(String m) { super(m); }
     }
 }

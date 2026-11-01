@@ -85,7 +85,7 @@ public class MalService implements AnimeListImporter {
         }
         if (entries.isEmpty()) {
             throw new NotFoundException(
-                    "Список \"" + clean + "\" пуст, скрыт или пользователь не найден");
+                    "Пользователь не найден на MAL");
         }
         log.info("MAL: {} → {} записей", clean, entries.size());
         return new ImportResult(0L, clean, entries.size(), entries);

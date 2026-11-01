@@ -67,7 +67,7 @@ public class YummyAnimeService implements AnimeListImporter {
         JsonNode arr = root.path("response");
         if (!arr.isArray() || arr.isEmpty()) {
             throw new NotFoundException(
-                    "Список \"" + clean + "\" пуст, скрыт или пользователь не найден");
+                    "Пользователь не найден на YummyAnime");
         }
 
         List<RatingEntry> entries = new ArrayList<>(arr.size());
@@ -245,7 +245,7 @@ public class YummyAnimeService implements AnimeListImporter {
             HttpResponse<String> resp = http.send(req,
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (resp.statusCode() == 404) {
-                throw new NotFoundException("YummyAnime 404");
+                throw new NotFoundException("Пользователь не найден на YummyAnime");
             }
             if (resp.statusCode() != 200) {
                 log.error("YummyAnime вернул ошибку. Статус: {}. URL: {}. Ответ: {}",

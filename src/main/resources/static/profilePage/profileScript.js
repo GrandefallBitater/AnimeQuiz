@@ -32,6 +32,11 @@ $(document).ready(function () {
     let onlyLocal    = true;
     let viewMode     = 'grid';
 
+    const pageCache     = new Map();
+    let cacheEpoch      = 0;
+    let prefetchRequest = null;
+    let prefetchKey     = null;
+
     const $grid        = $('#anGrid');
     const $empty       = $('#anEmpty');
     const $loadMore    = $('#anLoadMore');
@@ -64,11 +69,77 @@ $(document).ready(function () {
         };
     }
 
+    function pageKey(page) {
+        return [searchQuery, ACTIVE_STATUSES.join(','), onlyLocal, sortMode, page].join('|');
+    }
+
+    function resetPageCache() {
+        cacheEpoch++;
+        pageCache.clear();
+        if (prefetchRequest) {
+            prefetchRequest.abort();
+            prefetchRequest = null;
+        }
+        prefetchKey = null;
+    }
+
+    function prefetchNext(page) {
+        if (!hasMore) return;
+
+        const key = pageKey(page);
+        if (pageCache.has(key) || (prefetchKey === key && prefetchRequest)) return;
+
+        const epoch = cacheEpoch;
+        prefetchKey = key;
+        prefetchRequest = $.get('/profile/titles', buildParams(page), function (data) {
+            if (epoch === cacheEpoch) pageCache.set(key, data);
+        }).always(function () {
+            if (prefetchKey === key) {
+                prefetchKey = null;
+                prefetchRequest = null;
+            }
+        });
+    }
+
+    function applyPage(data, reset, fallbackPage) {
+        const titles = Array.isArray(data.titles) ? data.titles : [];
+
+        if (reset) {
+            $grid.empty();
+            loadedCount = 0;
+        }
+
+        updateMeta(data);
+
+        if (titles.length > 0) {
+            const $cards = $(titles.map(cardHtml).join(''));
+            $grid.append($cards);
+            bindPosterImages($cards.find('img'));
+            loadedCount += titles.length;
+        }
+
+        currentPage = data.page == null ? fallbackPage : data.page;
+        hasMore = !!data.hasMore;
+        updateView(data);
+    }
+
     function loadPage(reset, pageOverride) {
         if (!$grid.length) return;
         if (!reset && loading) return;
 
         const targetPage = reset ? 0 : (pageOverride == null ? currentPage + 1 : pageOverride);
+
+        if (reset) resetPageCache();
+
+        const key = pageKey(targetPage);
+        const cached = pageCache.get(key);
+        if (cached) {
+            pageCache.delete(key);
+            applyPage(cached, reset, targetPage);
+            prefetchNext(currentPage + 1);
+            return;
+        }
+
         const seq = ++requestSeq;
 
         if (pendingRequest) {
@@ -76,32 +147,25 @@ $(document).ready(function () {
             pendingRequest = null;
         }
 
+        let request;
+        if (prefetchKey === key && prefetchRequest) {
+            request = prefetchRequest;
+            prefetchKey = null;
+            prefetchRequest = null;
+        } else {
+            request = $.get('/profile/titles', buildParams(targetPage));
+        }
+
         loading = true;
         $loadMore.prop('disabled', true);
 
-        pendingRequest = $.get('/profile/titles', buildParams(targetPage))
+        pendingRequest = request
             .done(function (data) {
                 if (seq !== requestSeq) return;
 
-                const titles = Array.isArray(data.titles) ? data.titles : [];
-
-                if (reset) {
-                    $grid.empty();
-                    loadedCount = 0;
-                }
-
-                updateMeta(data);
-
-                if (titles.length > 0) {
-                    const $cards = $(titles.map(cardHtml).join(''));
-                    $grid.append($cards);
-                    bindPosterImages($cards.find('img'));
-                    loadedCount += titles.length;
-                }
-
-                currentPage = data.page == null ? targetPage : data.page;
-                hasMore = !!data.hasMore;
-                updateView(data);
+                pageCache.delete(key);
+                applyPage(data, reset, targetPage);
+                prefetchNext(currentPage + 1);
             })
             .fail(function (xhr) {
                 if (seq !== requestSeq || xhr.statusText === 'abort') return;

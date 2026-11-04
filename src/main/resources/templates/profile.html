@@ -21,7 +21,7 @@
     <link rel="stylesheet" th:href="@{header.css}">
     <link rel="stylesheet" th:href="@{floating_icons.css}">
 </head>
-<body>
+<body class="profile-page">
 
 <div th:replace="~{fragments/header :: header}"></div>
 
@@ -416,6 +416,7 @@
 <script th:src="@{toast.js}"></script>
 <script th:src="@{modal.js}"></script>
 <script th:src="@{header.js}"></script>
+<script th:src="@{pageVisibility.js}"></script>
 <script th:src="@{/auth/logout.js}"></script>
 <script th:src="@{profilePage/profileScript.js}"></script>
 </body>

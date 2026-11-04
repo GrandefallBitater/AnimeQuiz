@@ -141,19 +141,42 @@ public class profileController {
 
     @GetMapping("/profile/titles")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> getTitles(Authentication auth) {
+    public ResponseEntity<Map<String, Object>> getTitles(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "60") int size,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "true") boolean onlyLocal,
+            @RequestParam(defaultValue = "default") String sort,
+            Authentication auth) {
         if (!AuthService.isAuthenticated(auth)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("titles", List.of()));
         }
 
-        UserListService.UserListView view = userListService.getUserListView(auth.getName());
+        Set<String> statuses = new LinkedHashSet<>();
+        if (status != null && !status.isBlank()) {
+            for (String s : status.split(",")) {
+                String clean = s.trim().toLowerCase(Locale.ROOT);
+                if (!clean.isEmpty()) statuses.add(clean);
+            }
+        }
+
+        UserListService.UserListPage view = userListService.getUserListPage(
+                auth.getName(), page, size, q, statuses, onlyLocal, sort);
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("titles", view.titles());
         resp.put("count", view.titles().size());
+        resp.put("page", view.page());
+        resp.put("size", view.size());
         resp.put("hiddenCount", view.hiddenCount());
         resp.put("totalCount", view.totalCount());
+        resp.put("readyCount", view.readyCount());
+        resp.put("withPosterCount", view.withPosterCount());
+        resp.put("filteredCount", view.filteredCount());
+        resp.put("hasMore", view.hasMore());
+        resp.put("statusCounts", view.statusCounts());
 
         userListService.getLastImport(auth.getName()).ifPresent(ui -> {
             resp.put("source", ui.getSource());

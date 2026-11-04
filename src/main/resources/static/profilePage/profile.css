@@ -1,3 +1,9 @@
+.profile-page .site-header {
+    background: rgba(13, 13, 26, 0.94);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
 .settings-card {
     padding: 1.75rem 2rem;
     display: flex;
@@ -407,9 +413,7 @@ input[type="file"]::file-selector-button:hover {
     position: absolute;
     top: 8px;
     right: 8px;
-    background: rgba(13, 13, 26, 0.85);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(13, 13, 26, 0.92);
     color: #f1c40f;
     font-weight: 700;
     font-size: 0.78rem;
@@ -431,8 +435,6 @@ input[type="file"]::file-selector-button:hover {
     border-radius: 20px;
     text-transform: uppercase;
     letter-spacing: 1px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
 }
 .an-status-watching   { background: rgba(74, 222, 128, 0.9);  color: #0d0d1a; }
 .an-status-rewatching { background: rgba(56, 189, 248, 0.9);  color: #0d0d1a; }

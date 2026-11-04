@@ -1,3 +1,10 @@
+/* Пока вкладка неактивна, фоновые анимации не тратят ресурсы. */
+html.animations-paused *,
+html.animations-paused *::before,
+html.animations-paused *::after {
+    animation-play-state: paused !important;
+}
+
 body::before {
     content: '';
     position: fixed;

@@ -21,9 +21,12 @@ $(document).ready(function () {
     const STATUS_ORDER = ['watching','rewatching','planned','completed','on_hold','dropped'];
     const ACTIVE_STATUSES = [];
 
-    let allTitles    = [];
-    let filtered     = [];
-    let currentPage  = 1;
+    let currentPage  = 0;
+    let loadedCount  = 0;
+    let hasMore      = false;
+    let loading      = false;
+    let requestSeq   = 0;
+    let pendingRequest = null;
     let searchQuery  = '';
     let sortMode     = 'default';
     let onlyLocal    = true;
@@ -50,31 +53,117 @@ $(document).ready(function () {
     const $lastImports  = $('.js-last-import');
     const $summaryCount = $('#summaryTitlesCount');
 
-    function ingestViews(data) {
-        const titles = (data.titles || []).map((t, i) => Object.assign({}, t, { _idx: i }));
-        allTitles = titles;
+    function buildParams(page) {
+        return {
+            page: page,
+            size: PAGE_SIZE,
+            q: searchQuery,
+            status: ACTIVE_STATUSES.join(','),
+            onlyLocal: onlyLocal,
+            sort: sortMode
+        };
+    }
 
-        const hidden = data.hiddenCount || 0;
-        const total  = data.totalCount || titles.length;
+    function loadPage(reset, pageOverride) {
+        if (!$grid.length) return;
+        if (!reset && loading) return;
+
+        const targetPage = reset ? 0 : (pageOverride == null ? currentPage + 1 : pageOverride);
+        const seq = ++requestSeq;
+
+        if (pendingRequest) {
+            pendingRequest.abort();
+            pendingRequest = null;
+        }
+
+        loading = true;
+        $loadMore.prop('disabled', true);
+
+        pendingRequest = $.get('/profile/titles', buildParams(targetPage))
+            .done(function (data) {
+                if (seq !== requestSeq) return;
+
+                const titles = Array.isArray(data.titles) ? data.titles : [];
+
+                if (reset) {
+                    $grid.empty();
+                    loadedCount = 0;
+                }
+
+                updateMeta(data);
+
+                if (titles.length > 0) {
+                    const $cards = $(titles.map(cardHtml).join(''));
+                    $grid.append($cards);
+                    bindPosterImages($cards.find('img'));
+                    loadedCount += titles.length;
+                }
+
+                currentPage = data.page == null ? targetPage : data.page;
+                hasMore = !!data.hasMore;
+                updateView(data);
+            })
+            .fail(function (xhr) {
+                if (seq !== requestSeq || xhr.statusText === 'abort') return;
+                if (xhr.status === 401) return;
+
+                let msg = 'Не удалось загрузить список';
+                try { msg = JSON.parse(xhr.responseText).message || msg; } catch (_) {}
+                showToast(msg, 'error');
+            })
+            .always(function () {
+                if (seq !== requestSeq) return;
+                loading = false;
+                pendingRequest = null;
+                $loadMore.prop('disabled', false);
+            });
+    }
+
+    function bindPosterImages($images) {
+        $images.on('load', function () {
+            $(this).addClass('loaded');
+        }).each(function () {
+            if (this.complete && this.naturalWidth > 0) {
+                $(this).addClass('loaded');
+            }
+        });
+    }
+
+    function updateMeta(data) {
+        const total = data.totalCount || 0;
 
         $statTotal.text(total);
-        $statLocal.text(titles.filter(hasPoster).length);
+        $statLocal.text(data.withPosterCount || 0);
         $statSource.text(data.source || 'shikimori');
         $statImported.text(formatImportedAt(data.importedAt));
         $lastImports.text(formatImportedAt(data.importedAt));
         $summaryCount.text(total);
 
+        const hidden = data.hiddenCount || 0;
         if (hidden > 0) {
             $('#anStatHidden').text('+' + hidden + ' в обработке').show();
         } else {
             $('#anStatHidden').hide();
         }
 
-        renderStatusCounters();
-        applyFilters();
+        renderStatusCounters(data.statusCounts || {}, data.readyCount || 0);
+    }
+
+    function updateView(data) {
+        $statShown.text(loadedCount);
+        $loadMore.toggle(hasMore && loadedCount > 0);
+        $grid.toggleClass('list-view', viewMode === 'list');
+
+        if ((data.totalCount || 0) === 0) {
+            $titlesPanel.addClass('hidden');
+            $titlesEmpty.removeClass('hidden');
+            $empty.hide();
+            return;
+        }
 
         $titlesPanel.removeClass('hidden');
         $titlesEmpty.addClass('hidden');
+        $empty.toggle(loadedCount === 0);
     }
 
     function revealOnScroll() {
@@ -89,18 +178,12 @@ $(document).ready(function () {
         });
     }
 
-    function renderStatusCounters() {
-        const counts = {};
-        allTitles.forEach(t => {
-            const s = t.status || '';
-            counts[s] = (counts[s] || 0) + 1;
-        });
-
+    function renderStatusCounters(counts, readyCount) {
         const allActive = ACTIVE_STATUSES.length === 0;
 
         let html = `
             <button type="button" class="an-status-pill ${allActive ? 'is-active' : ''}"
-                    data-status="">Все <b>${allTitles.length}</b></button>`;
+                    data-status="">Все <b>${readyCount}</b></button>`;
 
         STATUS_ORDER.forEach(key => {
             const count = counts[key] || 0;
@@ -112,68 +195,6 @@ $(document).ready(function () {
         });
 
         $statusStats.html(html);
-    }
-
-    function applyFilters() {
-        const q = searchQuery.trim().toLowerCase();
-
-        filtered = allTitles.filter(t => {
-            if (ACTIVE_STATUSES.length && !ACTIVE_STATUSES.includes(t.status || '')) return false;
-            if (onlyLocal && !hasPoster(t)) return false;
-            if (!q) return true;
-
-            const title   = (t.title   || '').toLowerCase();
-            const name    = (t.name    || '').toLowerCase();
-            const russian = (t.russian || '').toLowerCase();
-            return title.includes(q) || name.includes(q) || russian.includes(q);
-        });
-
-        sortList();
-        currentPage = 1;
-        render();
-    }
-
-    function hasPoster(t) {
-        if (t.posterHash && t.posterExt) return true;
-        if (t.posterStatus === 'no_image') return false;
-        return false;
-    }
-
-    const collator = new Intl.Collator('ru', { sensitivity: 'base' });
-
-    function startsWithLetter(s) {
-        if (!s) return false;
-        const first = [...s][0];
-        return /\p{L}/u.test(first);
-    }
-
-    function sortList() {
-        switch (sortMode) {
-            case 'title-asc':
-            case 'title-desc': {
-                const dir = sortMode === 'title-asc' ? 1 : -1;
-                filtered.sort((a, b) => {
-                    const ka = titleOf(a), kb = titleOf(b);
-                    const la = startsWithLetter(ka), lb = startsWithLetter(kb);
-                    if (la !== lb) return la ? -1 : 1;
-                    return dir * collator.compare(ka, kb);
-                });
-                break;
-            }
-            case 'score-desc': filtered.sort((a, b) => (b.score | 0) - (a.score | 0)); break;
-            case 'score-asc':  filtered.sort((a, b) => (a.score | 0) - (b.score | 0)); break;
-            case 'status':
-                filtered.sort((a, b) => {
-                    const ia = STATUS_ORDER.indexOf(a.status);
-                    const ib = STATUS_ORDER.indexOf(b.status);
-                    const sa = ia === -1 ? 99 : ia;
-                    const sb = ib === -1 ? 99 : ib;
-                    return sa - sb || collator.compare(titleOf(a), titleOf(b));
-                });
-                break;
-            default:
-                filtered.sort((a, b) => (a._idx ?? 0) - (b._idx ?? 0));
-        }
     }
 
     function titleOf(t) {
@@ -188,24 +209,6 @@ $(document).ready(function () {
             return '/media/posters/' + encodeURIComponent(t.posterHash) + '.' + ext;
         }
         return FALLBACK_POSTER;
-    }
-
-    function render() {
-        if (!filtered.length) {
-            $grid.empty();
-            $empty.show();
-            $titlesEmpty.addClass('hidden');
-            $loadMore.hide();
-            $statShown.text(0);
-            return;
-        }
-        $empty.hide();
-        const shown = filtered.slice(0, currentPage * PAGE_SIZE);
-        $statShown.text(shown.length);
-        $grid.html(shown.map(cardHtml).join(''));
-        $grid.toggleClass('list-view', viewMode === 'list');
-        $grid.find('img').on('load', function () { $(this).addClass('loaded'); });
-        $loadMore.toggle(shown.length < filtered.length);
     }
 
     function cardHtml(t) {
@@ -366,9 +369,7 @@ $(document).ready(function () {
                     if (s.done) {
                         $('#globalImportProgress').fadeOut(500);
                         showToast('Постеры загружены', 'success');
-                        $.get('/profile/titles', function (data) {
-                            if (Array.isArray(data.titles)) ingestViews(data);
-                        });
+                        loadPage(true);
                     } else {
                         $('#globalImportProgress').fadeOut(500);
                         showToast('Прогрев постеров продолжается в фоне', 'info');
@@ -410,7 +411,10 @@ $(document).ready(function () {
             const val = $(this).val();
             $searchClear.toggle(val.length > 0);
             clearTimeout(searchTimer);
-            searchTimer = setTimeout(() => { searchQuery = val; applyFilters(); }, 180);
+            searchTimer = setTimeout(() => {
+                searchQuery = val;
+                loadPage(true);
+            }, 180);
         });
         $searchClear.on('click', function () {
             $search.val('').trigger('input').trigger('focus');
@@ -418,14 +422,12 @@ $(document).ready(function () {
 
         $sort.on('change', function () {
             sortMode = $(this).val();
-            sortList();
-            currentPage = 1;
-            render();
+            loadPage(true);
         });
 
         $onlyLocal.on('change', function () {
             onlyLocal = this.checked;
-            applyFilters();
+            loadPage(true);
         });
 
         $viewBtns.on('click', function () {
@@ -435,7 +437,9 @@ $(document).ready(function () {
             $grid.toggleClass('list-view', viewMode === 'list');
         });
 
-        $loadMore.on('click', function () { currentPage++; render(); });
+        $loadMore.on('click', function () {
+            loadPage(false, currentPage + 1);
+        });
 
         $statusStats.on('click', '.an-status-pill', function () {
             const newStatus = String($(this).data('status') || '');
@@ -448,8 +452,7 @@ $(document).ready(function () {
                 else ACTIVE_STATUSES.splice(i, 1);
             }
 
-            renderStatusCounters();
-            applyFilters();
+            loadPage(true);
         });
 
         $('#nameForm').on('submit', function (e) {
@@ -541,10 +544,7 @@ $(document).ready(function () {
                     showToast(resp.message || 'Импорт запущен', 'success');
                     $prog.find('.import-progress-text').text('Список загружен, постеры в фоне...');
 
-                    $.get('/profile/titles', function (data) {
-                        if (Array.isArray(data.titles)) ingestViews(data);
-                    });
-
+                    loadPage(true);
                     startPosterPolling();
                 })
                 .fail(function (xhr) {
@@ -586,14 +586,9 @@ $(document).ready(function () {
         bindEvents();
         revealOnScroll();
 
-        $.get('/profile/titles', function (data) {
-            if (Array.isArray(data.titles) && data.titles.length > 0) {
-                ingestViews(data);
-            }
-            if (data.source) {
-                activateTab(sourceToTab(data.source));
-            }
-        });
+        if (!$grid.length) return;
+
+        loadPage(true);
 
         $.get('/profile/import/status', function (s) {
             if (!s) return;
@@ -601,7 +596,7 @@ $(document).ready(function () {
                 showImportRunning();
                 startPosterPolling();
             } else if (s.total > 0 && !s.done) {
-                showGlobalProgress(s.ready, s.total);
+                showGlobalProgress(s.ready, s.total, s.hidden);
                 startPosterPolling();
             }
         });

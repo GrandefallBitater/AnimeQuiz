@@ -53,3 +53,6 @@ pgpass.conf
 
 ### Personal notes (not part of the public repository) ###
 docs/backup-restore.md
+
+### Local runtime configuration (not part of the repository) ###
+/config/

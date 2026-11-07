@@ -61,7 +61,7 @@ docker compose ps
 docker compose logs -f app
 ```
 
-`db` должен быть `healthy`, `app` — `running`.
+`db` должен быть `healthy`, `app` и `scheduler` — `running`.
 
 ## Настройка
 
@@ -77,6 +77,7 @@ docker compose logs -f app
 | `MAL_CLIENT_ID` | Client ID MyAnimeList | пусто |
 | `BACKUP_KEEP_DAYS` | срок хранения дампов БД | `30` |
 | `BACKUP_KEEP_ARCHIVES` | число архивов storage | `4` |
+| `TZ` | часовой пояс планировщика бэкапов | `UTC` |
 
 `.env` добавлен в `.gitignore`. Не коммитьте его и не публикуйте дампы:
 в них есть хеши паролей и пользовательские данные.
@@ -188,8 +189,10 @@ docker compose exec app find /app/storage -type f | wc -l
 
 ## Резервное копирование
 
-Резервное копирование выполняется отдельным контейнером из сервиса `backup`.
-На хосте не нужны `pg_dump`, `tar` или другие утилиты — только Docker.
+Резервное копирование выполняется внутри Docker. Постоянный контейнер
+`scheduler` запускает задачи по расписанию, а сервис `backup` используется для
+ручных запусков и восстановления. На хосте не нужны `pg_dump`, `tar`, `cron`
+или другие утилиты — только Docker.
 
 ### Что копируется
 
@@ -238,15 +241,43 @@ BACKUP_KEEP_ARCHIVES=4
 
 ### Автоматический запуск
 
-На хосте с cron добавьте задачи из `scripts/backup/crontab.example`:
+Расписание выполняет контейнер `scheduler` (Supercronic). Он запускается
+вместе с остальными сервисами и постоянно работает в фоне, а внутри него по
+расписанию вызывается тот же `scripts/backup.sh`. Cron на хосте не нужен.
+
+Расписание лежит в `scripts/backup/crontab`:
 
 ```cron
-0 3 * * * cd /opt/animequiz && docker compose --profile tools run --rm backup db >> backups/logs/cron.log 2>&1
-30 3 * * 0 cd /opt/animequiz && docker compose --profile tools run --rm backup storage >> backups/logs/cron.log 2>&1
+# ежедневный дамп базы в 03:00
+0 3 * * * /scripts/backup.sh db
+
+# еженедельный архив storage по воскресеньям в 03:30
+30 3 * * 0 /scripts/backup.sh storage
 ```
 
-Пользователь cron должен иметь доступ к Docker. Проверьте запуск вручную
-перед тем, как полагаться на расписание.
+Время считается в часовом поясе контейнера. Задайте его в `.env`:
+
+```properties
+TZ=Europe/Kyiv
+```
+
+Если `TZ` не задан, используется `UTC`. После изменения расписания или
+часового пояса перезапустите планировщик:
+
+```bash
+docker compose up -d scheduler
+```
+
+Проверка:
+
+```bash
+docker compose ps scheduler
+docker compose logs -f scheduler
+docker compose exec scheduler supercronic -test /scripts/crontab
+```
+
+Вывод задач идёт в `docker compose logs scheduler` и в
+`backups/logs/backup-<год-месяц>.log`.
 
 ### Восстановление базы
 
@@ -342,12 +373,13 @@ src/main/resources/
 ├── templates/      Thymeleaf-шаблоны
 └── application.properties
 
-scripts/backup/     резервное копирование и восстановление (Docker)
+scripts/backup/     резервное копирование, восстановление и расписание
 scripts/sql/        SQL-запросы для мониторинга базы
 
-Dockerfile          сборка образа приложения
-compose.yaml        PostgreSQL, приложение и сервис backup
-.env.example        шаблон локальных настроек
+Dockerfile            сборка образа приложения
+Dockerfile.scheduler  образ планировщика бэкапов (Supercronic)
+compose.yaml          PostgreSQL, приложение, планировщик и сервис backup
+.env.example          шаблон локальных настроек
 ```
 
 ## Диагностика
@@ -359,7 +391,7 @@ compose.yaml        PostgreSQL, приложение и сервис backup
 | Приложение не стартует, в логах ошибка подключения к БД | `docker compose ps`, `docker compose logs db`; дождитесь статуса `healthy` |
 | Flyway: `Detected applied migration not resolved locally` | версия приложения старше базы; используйте совместимый образ или дамп |
 | Нужно понять, сколько в каталоге заглушек и ошибок | выполните `scripts/sql/01_overview.sql`, список заглушек — `04_stubs.sql` |
-| Бэкап не запускается | проверьте, что Docker доступен пользователю cron, и запустите команду вручную |
+| Бэкап не запускается | `docker compose ps scheduler`, `docker compose logs scheduler`; расписание — `scripts/backup/crontab` |
 | Кириллица в логах выглядит битой | откройте файл в редакторе с UTF-8; Docker и PostgreSQL используют UTF-8 |
 | Нужно освободить место | `docker system df`, старые бэкапы в `backups/` |
 

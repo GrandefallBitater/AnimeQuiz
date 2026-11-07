@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1
+#
+# Backup scheduler image.
+#
+# Based on the same PostgreSQL image as the "backup" service, so pg_dump,
+# pg_restore, psql, tar, gzip and bash are already available. Supercronic is a
+# cron-compatible scheduler that keeps the container environment and writes job
+# output to stdout/stderr.
+
+FROM postgres:18.6
+
+ARG SUPERCRONIC_VERSION=v0.2.51
+ARG SUPERCRONIC_SHA256=cc232108374e8e2b537045f2d5eaa1229f619db314c3ba6a14d38b35dc0aa123
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends curl ca-certificates; \
+    curl -fsSL -o /usr/local/bin/supercronic \
+        "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-amd64"; \
+    echo "${SUPERCRONIC_SHA256}  /usr/local/bin/supercronic" | sha256sum -c -; \
+    chmod 0755 /usr/local/bin/supercronic; \
+    apt-get purge -y --auto-remove curl; \
+    rm -rf /var/lib/apt/lists/*; \
+    supercronic -version
+
+ENTRYPOINT ["/usr/local/bin/supercronic"]
+CMD ["/scripts/crontab"]

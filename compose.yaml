@@ -66,11 +66,41 @@ services:
       APP_PORT: 8081
       KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
       KEEP_ARCHIVES: ${BACKUP_KEEP_ARCHIVES:-4}
+      TZ: ${TZ:-UTC}
     volumes:
       - ./backups:/backups
       - animequiz_storage:/storage
       - ./scripts/backup:/scripts:ro
     entrypoint: ["/bin/bash", "/scripts/backup.sh"]
+
+  # Long-running scheduler. Supercronic reads scripts/backup/crontab and runs
+  # backup.sh inside this container, so no host cron is needed.
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.scheduler
+    container_name: animequiz-scheduler
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      BACKUP_ROOT: /backups
+      STORAGE_ROOT: /storage
+      APP_HOST: app
+      APP_PORT: 8081
+      KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
+      KEEP_ARCHIVES: ${BACKUP_KEEP_ARCHIVES:-4}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ./backups:/backups
+      - animequiz_storage:/storage
+      - ./scripts/backup:/scripts:ro
 
 volumes:
   animequiz_pgdata:

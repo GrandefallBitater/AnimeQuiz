@@ -1,0 +1,11 @@
+# AnimeQuiz backup schedule, executed by Supercronic in the "scheduler"
+# container. Times use the container timezone (TZ).
+#
+# Five fields: minute hour day-of-month month day-of-week.
+# Day-of-week: 0 = Sunday.
+
+# Daily database dump at 03:00.
+0 3 * * * /scripts/backup.sh db
+
+# Weekly storage archive on Sunday at 03:30.
+30 3 * * 0 /scripts/backup.sh storage

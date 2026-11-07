@@ -15,17 +15,14 @@
 
 ## Как запускать
 
-Через `psql` из корня проекта:
+Через контейнер базы из корня проекта:
 
-```powershell
-psql -h localhost -p 5433 -U postgres -d AnimeQuiz -f scripts\sql\01_overview.sql
+```bash
+docker compose exec -T db psql -U animequiz -d AnimeQuiz < scripts/sql/01_overview.sql
 ```
 
 Можно открыть файл в pgAdmin, DBeaver, Adminer или другом клиенте и выполнить
 его целиком.
-
-При сборке app-image каталог `scripts` копируется рядом с приложением, поэтому
-эти файлы будут доступны и в `%USERPROFILE%\Desktop\AnimeQuiz\scripts\sql`.
 
 Каждый файл начинается со строки:
 

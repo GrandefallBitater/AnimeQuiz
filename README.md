@@ -6,6 +6,7 @@
 
 Приложение написано на Spring Boot 3.2 (Java 17), использует PostgreSQL,
 Thymeleaf и локальное файловое хранилище для постеров и аватаров.
+Развёртывание выполняется только через Docker Compose.
 
 ## Содержание
 
@@ -26,121 +27,105 @@ Thymeleaf и локальное файловое хранилище для по�
 
 | Компонент | Версия |
 |---|---|
-| JDK | 17 (проект собран под Java 17) |
-| Maven | 3.8+ |
-| PostgreSQL | 13+ (рекомендуется 16–18) |
-| ОС | Windows 10/11 (x64) |
+| Docker Engine | 24+ |
+| Docker Compose | v2 |
+| ОС | любая, поддерживаемая Docker |
 
-Приложение и скрипты рассчитаны только на Windows. Для сборки и запуска
-нужны `cmd.exe` или Windows PowerShell 5.1 (или PowerShell 7), а также
-`pg_dump`/`pg_restore` из состава PostgreSQL. Архивация хранилища использует
-встроенный `tar.exe` (Windows 10 1803+).
+JDK, Maven и PostgreSQL на хосте не нужны: приложение собирается внутри
+Docker-образа, а база данных запускается отдельным контейнером.
 
 ## Быстрый старт
 
-### 1. Создайте базу данных
+### 1. Подготовьте окружение
 
-Проект по умолчанию подключается к PostgreSQL на `localhost:5433` (не 5432)
-к базе `AnimeQuiz`:
-
-```sql
-CREATE DATABASE "AnimeQuiz";
+```bash
+cp .env.example .env
 ```
 
-Схему `main`, таблицы и историю миграций создаст Flyway при первом запуске.
-Отдельно выполнять SQL-миграции не нужно.
+Откройте `.env` и задайте пароль PostgreSQL. Остальные значения можно
+оставить пустыми.
 
-### 2. Проверьте подключение
+### 2. Запустите приложение
 
-Параметры находятся в `src/main/resources/application.properties`:
-
-```properties
-spring.datasource.url=jdbc:postgresql://localhost:5433/AnimeQuiz?currentSchema=main
-spring.datasource.username=postgres
-spring.datasource.password=postgres
+```bash
+docker compose up -d --build
 ```
 
-Если у вас другой порт, пользователь или пароль — измените файл или задайте
-переменные окружения (см. [Настройка](#настройка)).
+Первый запуск собирает образ и может занять несколько минут. Приложение
+будет доступно по адресу <http://localhost:8081>.
 
-### 3. Запустите приложение
+### 3. Проверьте состояние
 
-```powershell
-mvn spring-boot:run
+```bash
+docker compose ps
+docker compose logs -f app
 ```
 
-Приложение будет доступно по адресу <http://localhost:8081>.
+`db` должен быть `healthy`, `app` — `running`.
 
 ## Настройка
 
-Основные параметры в `application.properties`:
+Параметры читаются из `.env` и `src/main/resources/application.properties`.
+Переменные окружения имеют приоритет.
+
+| Переменная | Назначение | По умолчанию |
+|---|---|---|
+| `POSTGRES_DB` | имя базы | `AnimeQuiz` |
+| `POSTGRES_USER` | пользователь PostgreSQL | `animequiz` |
+| `POSTGRES_PASSWORD` | пароль PostgreSQL | обязателен |
+| `YUMMY_APP_TOKEN` | токен YummyAnime | пусто |
+| `MAL_CLIENT_ID` | Client ID MyAnimeList | пусто |
+| `BACKUP_KEEP_DAYS` | срок хранения дампов БД | `30` |
+| `BACKUP_KEEP_ARCHIVES` | число архивов storage | `4` |
+
+`.env` добавлен в `.gitignore`. Не коммитьте его и не публикуйте дампы:
+в них есть хеши паролей и пользовательские данные.
+
+Параметры самого приложения:
 
 | Параметр | Назначение | По умолчанию |
 |---|---|---|
 | `server.port` | HTTP-порт | `8081` |
-| `server.address` | Интерфейс прослушивания | `0.0.0.0` |
-| `spring.datasource.url` | JDBC-URL PostgreSQL | `localhost:5433/AnimeQuiz` |
-| `app.storage.location` | Каталог постеров и аватаров | `%USERPROFILE%\.animequiz\storage` |
-| `app.yummy.app-token` | Токен YummyAnime | пусто |
-| `app.mal.client-id` | Client ID MyAnimeList | пусто |
-
-Секреты не обязательно хранить в файле: Spring Boot читает переменные
-окружения.
-
-```powershell
-$env:SPRING_DATASOURCE_URL = "jdbc:postgresql://localhost:5433/AnimeQuiz?currentSchema=main"
-$env:SPRING_DATASOURCE_USERNAME = "animequiz"
-$env:SPRING_DATASOURCE_PASSWORD = "change-me"
-$env:YUMMY_APP_TOKEN = "..."
-$env:MAL_CLIENT_ID = "..."
-```
-
-Переменные окружения имеют приоритет над `application.properties`.
+| `spring.datasource.url` | JDBC-URL PostgreSQL | `db:5432/AnimeQuiz` |
+| `app.storage.location` | каталог постеров и аватаров | `/app/storage` в Docker |
+| `logging.file.name` | файл логов | `/app/storage/logs/app.log` в Docker |
 
 ## Сборка и запуск
 
-### Обычный запуск
+```bash
+# собрать образ и запустить всё
+docker compose up -d --build
 
-```powershell
-mvn spring-boot:run
+# пересобрать только приложение
+docker compose build app
+docker compose up -d app
+
+# остановить, данные в томах сохранятся
+docker compose down
+
+# удалить контейнеры вместе с базой и storage
+docker compose down -v
 ```
 
-### Сборка jar
+`docker compose down -v` удаляет оба именованных тома. Используйте его только
+осознанно.
 
-```powershell
-mvn package
-java -jar target/AnimeQuiz-*.jar
+Логи приложения пишутся одновременно в stdout и в файл
+`/app/storage/logs/app.log` внутри тома `animequiz_animequiz_storage`.
+
+```bash
+docker compose logs -f app
+docker compose exec app tail -f /app/storage/logs/app.log
 ```
 
-> **Важно.** В `pom.xml` plugin `exec-maven-plugin` привязан к фазе `package`
-> и запускает `jpackage`. В результате `mvn package` дополнительно создаёт
-> app-image в `%USERPROFILE%\Desktop\AnimeQuiz` и требует файл
-> `anime-logo.ico` в корне проекта и JDK с утилитой `jpackage`.
-> Если нужен только исполняемый jar, пропустите этот шаг:
->
-> ```powershell
-> mvn package -Dexec.skip=true
-> ```
+Для локальной разработки без Docker можно собрать jar:
 
-При сборке app-image:
-
-1. Старая папка `%USERPROFILE%\Desktop\AnimeQuiz` удаляется — иначе jpackage
-   отказывается работать («Application destination directory already exists»).
-   Поэтому перед сборкой закройте запущенное приложение.
-2. jpackage собирает образ из содержимого `target`.
-3. Каталог `scripts` копируется рядом с `AnimeQuiz.exe`, то есть в
-   `%USERPROFILE%\Desktop\AnimeQuiz\scripts`. Внутри сохраняются подпапки
-   `backup` (резервное копирование) и `sql` (запросы для мониторинга).
-
-Скрипты не зависят от расположения: пути они вычисляют от собственного
-каталога. Но задачи планировщика запоминают абсолютный путь, поэтому после
-переноса папки скрипты нужно зарегистрировать заново (см. ниже).
-
-### Запуск с другим профилем или портом
-
-```powershell
-java -jar target/AnimeQuiz-*.jar --server.port=9090
+```bash
+mvn -DskipTests package
 ```
+
+Но запускать приложение рекомендуется через Compose, чтобы не расходились
+версии PostgreSQL и параметры окружения.
 
 ## Первый вход
 
@@ -155,12 +140,12 @@ java -jar target/AnimeQuiz-*.jar --server.port=9090
 
 Миграция `V2__add_test_admin.sql` создаёт демонстрационные учётные записи
 `admin` и `user` с предустановленным хешем пароля. Для собственного
-развёртывания создайте нового пользователя через `/register`, а роль
-администратора выдайте в базе:
+развёртывания создайте пользователя через `/register`, а роль администратора
+выдайте в базе:
 
-```sql
-INSERT INTO main.authorities (username, authority)
-VALUES ('your_username', 'ROLE_ADMIN');
+```bash
+docker compose exec db psql -U animequiz -d AnimeQuiz -c \
+  "INSERT INTO main.authorities (username, authority) VALUES ('your_username', 'ROLE_ADMIN');"
 ```
 
 Перед публикацией приложения в интернет удалите или отключите демонстрационные
@@ -168,29 +153,26 @@ VALUES ('your_username', 'ROLE_ADMIN');
 
 ## Хранилище файлов
 
-Постеры и аватары хранятся не в базе, а на диске:
+Постеры, аватары и логи хранятся не в базе, а в именованном томе:
 
 ```text
-%USERPROFILE%\.animequiz\storage\
-├── avatars\
-├── posters\
-├── site_titles\
-└── titles\
+animequiz_animequiz_storage -> /app/storage
+├── avatars/
+├── posters/
+└── logs/
+    └── app.log
 ```
 
-Каталог создаётся автоматически. Постеры адресуются по SHA-256 и
-скачиваются фоновым обработчиком. При переносе приложения на другую машину
-каталог нужно скопировать отдельно — в дамп базы он не входит.
+Том создаётся автоматически. Постеры адресуются по SHA-256 и скачиваются
+фоновым обработчиком. При переносе развёртывания на другую машину данные
+переносятся вместе с томом или из резервной копии.
 
-Путь можно переопределить:
+Посмотреть содержимое тома:
 
-```properties
-app.storage.location=D:/animequiz/storage
+```bash
+docker compose exec app ls -la /app/storage
+docker compose exec app find /app/storage -type f | wc -l
 ```
-
-В `application.properties` обратный слэш является экранирующим символом,
-поэтому путь записан через прямой: `D:/animequiz/storage` для Windows
-равнозначен `D:\animequiz\storage`.
 
 ## Импорт каталога
 
@@ -206,117 +188,108 @@ app.storage.location=D:/animequiz/storage
 
 ## Резервное копирование
 
-В проекте есть готовые скрипты для Windows PowerShell. Они делают логический
-дамп PostgreSQL и zip-архив файлового хранилища.
+Резервное копирование выполняется отдельным контейнером из сервиса `backup`.
+На хосте не нужны `pg_dump`, `tar` или другие утилиты — только Docker.
 
 ### Что копируется
 
 | Данные | Формат | Расписание по умолчанию | Хранение |
 |---|---|---|---|
 | База `AnimeQuiz` | `pg_dump --format=custom` | ежедневно в 03:00 | 30 дней |
-| Постеры и аватары | ZIP | воскресенье в 03:30 | 4 архива |
-| Журналы скриптов | текст | при каждом запуске | не удаляются |
+| Постеры и аватары | `tar.gz` | воскресенье в 03:30 | 4 архива |
+| Журналы запусков | текст | при каждом запуске | не удаляются |
 
-По умолчанию всё складывается в `%USERPROFILE%\Backups\AnimeQuiz`:
+Каталог логов внутри storage (`logs/`) в архив не попадает.
+
+По умолчанию всё складывается в `backups/` рядом с `compose.yaml`:
 
 ```text
-%USERPROFILE%\Backups\AnimeQuiz\
-├── db\
-├── storage\
-└── logs\
+backups/
+├── db/
+├── storage/
+└── logs/
 ```
 
-Путь можно изменить параметром `-BackupRoot` или переменной окружения
-`ANIMEQUIZ_BACKUP_ROOT`.
-
-### Настройка пароля PostgreSQL
-
-Скрипты не запрашивают пароль интерактивно и используют стандартный файл
-`pgpass`:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\setup-pgpass.ps1
-```
-
-Скрипт создаст `%APPDATA%\postgresql\pgpass.conf`, ограничит права доступа
-текущим пользователем и проверит подключение. Пароль хранится в открытом
-виде — это штатное поведение libpq; защита строится на правах к файлу.
+`backups/` добавлен в `.gitignore`. Храните копии вне репозитория и, желательно,
+на другом диске или в удалённом хранилище.
 
 ### Ручной запуск
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\backup-db.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\backup-storage.ps1
+```bash
+# дамп базы
+docker compose --profile tools run --rm backup db
+
+# архив постеров и аватаров
+docker compose --profile tools run --rm backup storage
+
+# оба действия подряд
+docker compose --profile tools run --rm backup all
+
+# список файлов
+docker compose --profile tools run --rm backup list
 ```
 
-Параметры:
+Параметры хранения можно задать в `.env`:
 
-```powershell
-# другой каталог и срок хранения
-... backup-db.ps1 -BackupRoot D:\Backups\AnimeQuiz -KeepDays 60
-
-# другое число недельных архивов
-... backup-storage.ps1 -KeepArchives 8
+```properties
+BACKUP_KEEP_DAYS=30
+BACKUP_KEEP_ARCHIVES=4
 ```
 
 ### Автоматический запуск
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\register-backup-tasks.ps1
+На хосте с cron добавьте задачи из `scripts/backup/crontab.example`:
+
+```cron
+0 3 * * * cd /opt/animequiz && docker compose --profile tools run --rm backup db >> backups/logs/cron.log 2>&1
+30 3 * * 0 cd /opt/animequiz && docker compose --profile tools run --rm backup storage >> backups/logs/cron.log 2>&1
 ```
 
-Создаются задачи `AnimeQuiz DB Backup` и `AnimeQuiz Storage Backup` с
-параметром «выполнять при пропущенном запуске». Если скрипт запущен без прав
-администратора, задачи создаются в режиме `Interactive` — они выполняются,
-когда пользователь вошёл в Windows. Для работы без входа в систему запустите
-скрипт от имени администратора.
-
-Задачи ссылаются на тот каталог, из которого запущен скрипт. Если запустить
-`register-backup-tasks.ps1` из `%USERPROFILE%\Desktop\AnimeQuiz\scripts\backup`,
-планировщик будет брать скрипты оттуда, а не из репозитория.
-
-Проверка:
-
-```powershell
-Get-ScheduledTask -TaskName "AnimeQuiz DB Backup", "AnimeQuiz Storage Backup"
-Get-ScheduledTaskInfo -TaskName "AnimeQuiz DB Backup"
-```
-
-`LastTaskResult = 0` означает успех.
+Пользователь cron должен иметь доступ к Docker. Проверьте запуск вручную
+перед тем, как полагаться на расписание.
 
 ### Восстановление базы
 
 Безопасный вариант — в отдельную базу `AnimeQuiz_restore`, рабочая база не
 затрагивается:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\restore-db.ps1
+```bash
+docker compose --profile tools run --rm backup restore-db
 ```
 
-Скрипт возьмёт самый свежий дамп, проверит контрольную сумму, создаст базу и
-покажет количество строк и историю Flyway.
+Скрипт возьмёт самый свежий дамп, проверит SHA-256, создаст базу с кодировкой
+`UTF8` и локалью `C.UTF-8`, восстановит данные и покажет количество строк и
+историю Flyway.
 
-Восстановление поверх рабочей базы требует `-Force` и остановленного
+Восстановление поверх рабочей базы требует `--force` и остановленного
 приложения:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\restore-db.ps1 `
-    -TargetDatabase AnimeQuiz -Force
+```bash
+docker compose stop app
+docker compose --profile tools run --rm backup restore-db \
+  --file db/AnimeQuiz_2026-11-07_030000.dump \
+  --target AnimeQuiz \
+  --force
+docker compose start app
 ```
 
 Дамп содержит историю Flyway. Восстанавливать его нужно вместе с совместимой
-версией приложения: откат базы — это всегда дамп + версия кода, которая
+версией приложения: откат базы — это всегда дамп плюс версия кода, которая
 работала на момент дампа.
 
 ### Восстановление файлов
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\restore-storage.ps1
+```bash
+docker compose stop app
+docker compose --profile tools run --rm backup restore-storage --force
+docker compose start app
 ```
 
-Текущий каталог storage будет переименован в `storage.bak-<дата>`, архив
-распакован, при ошибке выполнится откат. Старую папку можно удалить после
-проверки или сразу передать `-RemoveOldOnSuccess`.
+Текущее содержимое storage (кроме `logs/`) перемещается в
+`/app/storage/.restore-<дата>`, архив распаковывается, при ошибке выполняется
+откат. Старые файлы можно удалить после проверки или сразу передать
+`--remove-old`. Если приложение ещё отвечает на `app:8081`, скрипт откажется
+работать без `--force`.
 
 ### Ограничения
 
@@ -324,7 +297,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\restore-stora
   отказа диска. Для надёжности используйте второй диск или внешнее хранилище.
 - В дампе хранятся хеши паролей и пользовательские данные. Не публикуйте
   дампы.
-- Перед восстановлением рабочей базы остановите приложение.
+- Перед восстановлением рабочей базы и storage остановите приложение.
 - Проверяйте бэкапы восстановлением: дамп, который ни разу не разворачивали,
   нельзя считать надёжным.
 
@@ -342,19 +315,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup\restore-stora
 | `04_stubs.sql` | Список заглушек с ошибками обогащения и числом списков. |
 | `05_top_titles.sql` | Топ-50 тайтлов по числу списков пользователей. |
 
-Запуск через `psql`:
+Запуск через контейнер базы:
 
-```powershell
-psql -h localhost -p 5433 -U postgres -d AnimeQuiz -f scripts\sql\01_overview.sql
+```bash
+docker compose exec -T db psql -U animequiz -d AnimeQuiz < scripts/sql/01_overview.sql
 ```
 
 Файлы также можно открыть в pgAdmin, DBeaver или Adminer и выполнить целиком.
 Запросы начинаются с `SET search_path TO main;`; при другой схеме поправьте
 эту строку. Подробное описание полей и того, что считать заглушкой, — в
 `scripts/sql/README.md`.
-
-При сборке app-image каталог `scripts` копируется целиком, поэтому запросы
-окажутся и в `%USERPROFILE%\Desktop\AnimeQuiz\scripts\sql`.
 
 ## Структура проекта
 
@@ -372,34 +342,49 @@ src/main/resources/
 ├── templates/      Thymeleaf-шаблоны
 └── application.properties
 
-scripts/backup/     резервное копирование и восстановление (Windows)
+scripts/backup/     резервное копирование и восстановление (Docker)
 scripts/sql/        SQL-запросы для мониторинга базы
+
+Dockerfile          сборка образа приложения
+compose.yaml        PostgreSQL, приложение и сервис backup
+.env.example        шаблон локальных настроек
 ```
 
 ## Диагностика
 
 | Проблема | Решение |
 |---|---|
-| `Connection refused` к PostgreSQL | проверьте, что сервер запущен и слушает порт `5433` |
-| `database "AnimeQuiz" does not exist` | создайте базу: `CREATE DATABASE "AnimeQuiz";` |
-| Flyway: `Detected applied migration not resolved locally` | версия приложения старше базы; используйте совместимый jar или дамп |
-| `mvn package` падает на `jpackage` | добавьте `anime-logo.ico` в корень или запустите `mvn package -Dexec.skip=true` |
-| `pg_dump not found` | установите PostgreSQL client tools или задайте `ANIMEQUIZ_PG_BIN` |
-| Нужно понять, сколько в каталоге заглушек и ошибок | выполните `scripts\sql\01_overview.sql`, список заглушек — `04_stubs.sql` |
-| Задача планировщика не выполняется | проверьте `Get-ScheduledTaskInfo`; режим `Interactive` требует входа в Windows |
-| Кириллица в логах выглядит битой | откройте файл в редакторе с UTF-8, смените кодировку консоли на UTF-8 |
+| `port is already allocated` | остановите процесс на порту 8081 или 5434 |
+| `database "AnimeQuiz" does not exist` | проверьте `.env` и пересоздайте контейнеры: `docker compose down && docker compose up -d` |
+| Приложение не стартует, в логах ошибка подключения к БД | `docker compose ps`, `docker compose logs db`; дождитесь статуса `healthy` |
+| Flyway: `Detected applied migration not resolved locally` | версия приложения старше базы; используйте совместимый образ или дамп |
+| Нужно понять, сколько в каталоге заглушек и ошибок | выполните `scripts/sql/01_overview.sql`, список заглушек — `04_stubs.sql` |
+| Бэкап не запускается | проверьте, что Docker доступен пользователю cron, и запустите команду вручную |
+| Кириллица в логах выглядит битой | откройте файл в редакторе с UTF-8; Docker и PostgreSQL используют UTF-8 |
+| Нужно освободить место | `docker system df`, старые бэкапы в `backups/` |
+
+Полезные команды:
+
+```bash
+docker compose ps
+docker compose logs --tail 100 app
+docker compose exec db psql -U animequiz -d AnimeQuiz
+docker volume ls --filter name=animequiz
+docker volume inspect animequiz_animequiz_pgdata
+```
 
 ## Безопасность
 
 Проект предназначен для локального или домашнего использования. Перед
 публикацией в интернет:
 
-1. Смените пароль PostgreSQL и пароль приложения по умолчанию.
-2. Удалите демонстрационные учётные записи `admin` и `user`.
+1. Смените пароль PostgreSQL в `.env` и удалите демонстрационные учётные
+   записи `admin` и `user`.
+2. Не открывайте порт PostgreSQL (`5434`) наружу без необходимости.
 3. Ограничьте `server.address` локальным интерфейсом или поставьте reverse
    proxy с HTTPS.
 4. Проверьте права на эндпоинты создания и редактирования пользователей.
-5. Не храните `pgpass.conf`, `.env` и дампы в репозитории.
+5. Не храните `.env`, `backups/` и дампы в репозитории.
 
 ## Лицензия
 

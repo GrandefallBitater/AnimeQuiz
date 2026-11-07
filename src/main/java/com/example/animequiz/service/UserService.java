@@ -50,6 +50,7 @@ public class UserService {
     public void deleteUser(String username) {
         User user = userRepository.findByUsername(username).orElseThrow(() -> new NotFoundException("Пользователь не найден"));
         userRepository.deleteById(user.getUsername());
+        sessionService.expireUserSessions(username);
         String key = "u_" + username;
         String sk = StorageService.sanitizeKey(key);
         try {

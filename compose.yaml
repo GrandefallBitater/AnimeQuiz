@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:18.6
+    container_name: animequiz-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5434:5432"
+    volumes:
+      # PostgreSQL 18+ stores data under /var/lib/postgresql/<major>/docker,
+      # so the volume must be mounted at /var/lib/postgresql.
+      - animequiz_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    shm_size: 128mb
+
+  app:
+    build:
+      context: .
+    container_name: animequiz-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/AnimeQuiz?currentSchema=main
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_STORAGE_LOCATION: /app/storage
+      YUMMY_APP_TOKEN: ${YUMMY_APP_TOKEN}
+      MAL_CLIENT_ID: ${MAL_CLIENT_ID}
+      # Log to stdout so Docker captures the output.
+      LOGGING_FILE_NAME: ""
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
+    volumes:
+      - animequiz_storage:/app/storage
+    ports:
+      - "8081:8081"
+
+volumes:
+  animequiz_pgdata:
+  animequiz_storage:

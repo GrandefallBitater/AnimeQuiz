@@ -56,3 +56,4 @@ docs/backup-restore.md
 
 ### Local runtime configuration (not part of the repository) ###
 /config/
+/storage/

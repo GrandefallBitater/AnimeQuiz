@@ -1,0 +1,30 @@
+name: Java CI with Maven
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  # Manual runs are a separate trigger, not a branch name.
+  workflow_dispatch:
+
+# The job only reads the repository. Nothing else is needed.
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    # The runner is a Windows machine that is always started by hand, so it can
+    # also reach Docker Desktop and the user-installed Maven.
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - name: Build with Maven
+        run: mvn -B package --file pom.xml

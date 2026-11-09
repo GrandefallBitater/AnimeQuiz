@@ -4,3 +4,4 @@ Dockerfile text eol=lf
 compose.yaml text eol=lf
 *.example text eol=lf
 scripts/backup/crontab text eol=lf
+*.java text eol=lf

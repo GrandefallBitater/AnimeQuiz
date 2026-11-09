@@ -163,6 +163,7 @@
             <removeUnusedImports />
             <trimTrailingWhitespace />
             <endWithNewline />
+            <lineEndings>UNIX</lineEndings>
           </java>
         </configuration>
         <executions>

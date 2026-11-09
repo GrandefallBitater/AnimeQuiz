@@ -15,7 +15,6 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -40,14 +39,14 @@ public class UserController {
 
     @ResponseBody
     @GetMapping("/getUsers")
-    @Secured({"ROLE_ADMIN"})
+    @PreAuthorize("hasRole('ADMIN')")
     public List<UserDto> getUsers() {
         return userService.getUsers().stream().map(this::toDto).collect(Collectors.toList());
     }
 
     @ResponseBody
     @GetMapping("/getAdminInfo")
-    @Secured({"ROLE_ADMIN"})
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> getAdminInfo(Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) {
             return Map.of("authenticated", false);

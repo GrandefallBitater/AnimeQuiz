@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.animequiz.dto.UserRequest;
 import com.example.animequiz.exceptions.GlobalExceptionHandler;
 import com.example.animequiz.exceptions.InvalidInputException;
 import com.example.animequiz.service.UserService;
@@ -45,9 +46,9 @@ class RegisterControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Аккаунт создан! Теперь войдите"));
 
-        ArgumentCaptor<UserController.UserRequest> captor = ArgumentCaptor.forClass(UserController.UserRequest.class);
+        ArgumentCaptor<UserRequest> captor = ArgumentCaptor.forClass(UserRequest.class);
         verify(userService).createUser(captor.capture());
-        UserController.UserRequest request = captor.getValue();
+        UserRequest request = captor.getValue();
         assertThat(request.username()).isEqualTo("alice");
         assertThat(request.displayName()).isEqualTo("alice");
         assertThat(request.enabled()).isTrue();

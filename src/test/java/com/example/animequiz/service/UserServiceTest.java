@@ -11,7 +11,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.example.animequiz.controller.UserController;
+import com.example.animequiz.dto.AdminUpdateRequest;
+import com.example.animequiz.dto.SelfUpdateRequest;
+import com.example.animequiz.dto.UserRequest;
 import com.example.animequiz.entity.Authority;
 import com.example.animequiz.entity.User;
 import com.example.animequiz.exceptions.ConflictException;
@@ -162,7 +164,7 @@ class UserServiceTest {
         User user = new User("alice", "pw", true);
         when(userRepository.findById("alice")).thenReturn(Optional.of(user));
 
-        userService.updateSelfProfile(new UserController.SelfUpdateRequest("alice", "  Alice  "));
+        userService.updateSelfProfile(new SelfUpdateRequest("alice", "  Alice  "));
 
         assertThat(user.getDisplayName()).isEqualTo("Alice");
     }
@@ -171,7 +173,7 @@ class UserServiceTest {
     void updateSelfProfileThrowsWhenUserDoesNotExist() {
         when(userRepository.findById("ghost")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> userService.updateSelfProfile(new UserController.SelfUpdateRequest("ghost", "Ghost")))
+        assertThatThrownBy(() -> userService.updateSelfProfile(new SelfUpdateRequest("ghost", "Ghost")))
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -184,7 +186,7 @@ class UserServiceTest {
         user.setAuthorities(new ArrayList<>(List.of(oldRole)));
         when(userRepository.findById("alice")).thenReturn(Optional.of(user));
 
-        userService.updateUserByAdmin(new UserController.AdminUpdateRequest("alice", "Alice", false, "ADMIN"));
+        userService.updateUserByAdmin(new AdminUpdateRequest("alice", "Alice", false, "ADMIN"));
 
         assertThat(user.getDisplayName()).isEqualTo("Alice");
         assertThat(user.isEnabled()).isFalse();
@@ -202,7 +204,7 @@ class UserServiceTest {
         user.setAuthorities(new ArrayList<>(List.of(role)));
         when(userRepository.findById("alice")).thenReturn(Optional.of(user));
 
-        userService.updateUserByAdmin(new UserController.AdminUpdateRequest("alice", "Alice", true, "USER"));
+        userService.updateUserByAdmin(new AdminUpdateRequest("alice", "Alice", true, "USER"));
 
         assertThat(user.getAuthorities()).containsExactly(role);
     }
@@ -211,8 +213,7 @@ class UserServiceTest {
     void updateUserByAdminThrowsWhenUserDoesNotExist() {
         when(userRepository.findById("ghost")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> userService.updateUserByAdmin(
-                        new UserController.AdminUpdateRequest("ghost", "Ghost", true, "USER")))
+        assertThatThrownBy(() -> userService.updateUserByAdmin(new AdminUpdateRequest("ghost", "Ghost", true, "USER")))
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -226,8 +227,7 @@ class UserServiceTest {
         assertThat(userService.getUser("alice")).contains(user);
     }
 
-    private static UserController.UserRequest request(
-            String username, String displayName, String role, String password) {
-        return new UserController.UserRequest(username, displayName, true, role, password, null);
+    private static UserRequest request(String username, String displayName, String role, String password) {
+        return new UserRequest(username, displayName, true, role, password, null);
     }
 }

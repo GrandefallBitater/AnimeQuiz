@@ -1,5 +1,6 @@
 package com.example.animequiz.controller;
 
+import com.example.animequiz.dto.UserRequest;
 import com.example.animequiz.service.UserService;
 import com.example.animequiz.validation.InputValidation;
 import java.util.Map;
@@ -27,8 +28,7 @@ public class RegisterController {
 
         final String cleanUsername = InputValidation.normalizeUsername(username);
 
-        UserController.UserRequest userRequest =
-                new UserController.UserRequest(cleanUsername, cleanUsername, true, "USER", password, null);
+        UserRequest userRequest = new UserRequest(cleanUsername, cleanUsername, true, "USER", password, null);
         userService.createUser(userRequest);
         return ResponseEntity.ok(Map.of("message", "Аккаунт создан! Теперь войдите"));
     }

@@ -1,5 +1,8 @@
 package com.example.animequiz.controller;
 
+import com.example.animequiz.dto.AdminUpdateRequest;
+import com.example.animequiz.dto.SelfUpdateRequest;
+import com.example.animequiz.dto.UserRequest;
 import com.example.animequiz.entity.User;
 import com.example.animequiz.entity.UserDto;
 import com.example.animequiz.service.AuthService;
@@ -100,7 +103,7 @@ public class UserController {
     @PreAuthorize("(hasRole('ADMIN') and authentication.name != #request.username)"
             + " or (hasRole('USER') and authentication.name == #request.username)")
     public Map<String, String> deleteUser(@RequestBody UserRequest request) {
-        userService.deleteUser(request.username);
+        userService.deleteUser(request.username());
         return Map.of("message", "Пользователь успешно удалён");
     }
 
@@ -145,11 +148,4 @@ public class UserController {
 
         return Map.of("message", "Пользователь обновлён", "isSelfUpdate", isSelfUpdate);
     }
-
-    public record UserRequest(
-            String username, String displayName, boolean enabled, String role, String password, String avatarUrl) {}
-
-    public record SelfUpdateRequest(String username, String displayName) {}
-
-    public record AdminUpdateRequest(String username, String displayName, boolean enabled, String role) {}
 }

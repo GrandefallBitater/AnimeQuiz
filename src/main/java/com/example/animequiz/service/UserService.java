@@ -1,6 +1,8 @@
 package com.example.animequiz.service;
 
-import com.example.animequiz.controller.UserController;
+import com.example.animequiz.dto.AdminUpdateRequest;
+import com.example.animequiz.dto.SelfUpdateRequest;
+import com.example.animequiz.dto.UserRequest;
 import com.example.animequiz.entity.Authority;
 import com.example.animequiz.entity.User;
 import com.example.animequiz.exceptions.ConflictException;
@@ -63,7 +65,7 @@ public class UserService {
         }
     }
 
-    public void createUser(UserController.UserRequest userDto) {
+    public void createUser(UserRequest userDto) {
         final String username;
         final String displayName;
 
@@ -98,7 +100,7 @@ public class UserService {
     }
 
     @Transactional
-    public void updateSelfProfile(UserController.SelfUpdateRequest request) {
+    public void updateSelfProfile(SelfUpdateRequest request) {
         User user = userRepository
                 .findById(request.username())
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
@@ -108,7 +110,7 @@ public class UserService {
     }
 
     @Transactional
-    public void updateUserByAdmin(UserController.AdminUpdateRequest request) {
+    public void updateUserByAdmin(AdminUpdateRequest request) {
         User user = userRepository
                 .findById(request.username())
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден"));

@@ -11,6 +11,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.animequiz.dto.AdminUpdateRequest;
+import com.example.animequiz.dto.SelfUpdateRequest;
+import com.example.animequiz.dto.UserRequest;
 import com.example.animequiz.entity.Authority;
 import com.example.animequiz.entity.User;
 import com.example.animequiz.exceptions.GlobalExceptionHandler;
@@ -110,7 +113,7 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Пользователь успешно создан"));
 
-        verify(userService).createUser(any(UserController.UserRequest.class));
+        verify(userService).createUser(any(UserRequest.class));
     }
 
     @Test
@@ -128,7 +131,7 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isSelfUpdate").value(true));
 
-        verify(userService).updateSelfProfile(new UserController.SelfUpdateRequest("alice", "Alice"));
+        verify(userService).updateSelfProfile(new SelfUpdateRequest("alice", "Alice"));
         verify(userService, never()).updateUserByAdmin(any());
         verify(authService).updateSecurityContext(any(), any());
     }
@@ -144,7 +147,7 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isSelfUpdate").value(false));
 
-        verify(userService).updateUserByAdmin(new UserController.AdminUpdateRequest("alice", "Alice", false, "USER"));
+        verify(userService).updateUserByAdmin(new AdminUpdateRequest("alice", "Alice", false, "USER"));
     }
 
     @Test

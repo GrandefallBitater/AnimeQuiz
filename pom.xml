@@ -109,7 +109,6 @@
           <schemas>
             <schema>main</schema>
           </schemas>
-          <cleanDisabled>false</cleanDisabled>
         </configuration>
       </plugin>
       <plugin>

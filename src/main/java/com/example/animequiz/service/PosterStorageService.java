@@ -4,10 +4,6 @@ import com.example.animequiz.service.ratelimit.SourceRateLimiter;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -25,15 +21,16 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
 public class PosterStorageService {
 
     private static final long MAX_BYTES = 10L * 1024 * 1024;
-    private static final Set<String> ALLOWED_MIME = Set.of(
-            "image/png", "image/jpeg", "image/gif", "image/webp"
-    );
+    private static final Set<String> ALLOWED_MIME = Set.of("image/png", "image/jpeg", "image/gif", "image/webp");
     private static final List<String> ALL_EXT = List.of("jpg", "png", "gif", "webp");
 
     private final Path postersDir;
@@ -48,10 +45,9 @@ public class PosterStorageService {
 
     public PosterStorageService(
             @Value("${app.storage.location}") String location,
-            @Value("${app.shikimori.user-agent}") String userAgent, SourceRateLimiter rateLimiter) {
-        this.postersDir = Paths.get(location)
-                .toAbsolutePath().normalize()
-                .resolve("posters");
+            @Value("${app.shikimori.user-agent}") String userAgent,
+            SourceRateLimiter rateLimiter) {
+        this.postersDir = Paths.get(location).toAbsolutePath().normalize().resolve("posters");
         this.rateLimiter = rateLimiter;
         this.urlIndexFile = this.postersDir.resolve("_url_index.json");
         this.userAgent = userAgent;
@@ -66,9 +62,8 @@ public class PosterStorageService {
         Files.createDirectories(postersDir);
         if (Files.isRegularFile(urlIndexFile)) {
             try {
-                Map<String, String> loaded = mapper.readValue(
-                        urlIndexFile.toFile(),
-                        new TypeReference<HashMap<String, String>>() {});
+                Map<String, String> loaded =
+                        mapper.readValue(urlIndexFile.toFile(), new TypeReference<HashMap<String, String>>() {});
                 urlToHash.putAll(loaded);
                 log.info("Загружен URL-индекс постеров: {} записей", loaded.size());
             } catch (IOException e) {
@@ -77,8 +72,7 @@ public class PosterStorageService {
         }
     }
 
-    public record StoredPoster(String hash, String path, String mime,
-                               long size, String ext) {}
+    public record StoredPoster(String hash, String path, String mime, long size, String ext) {}
 
     public Optional<StoredPoster> findByUrl(String url) {
         if (url == null || url.isBlank()) return Optional.empty();
@@ -90,10 +84,9 @@ public class PosterStorageService {
             Path p = resolve(hash, ext);
             if (Files.isRegularFile(p)) {
                 try {
-                    String localPath = "posters/"
-                            + postersDir.relativize(p).toString().replace('\\', '/');
-                    return Optional.of(new StoredPoster(
-                            hash, localPath, mimeForExt(ext), Files.size(p), ext));
+                    String localPath =
+                            "posters/" + postersDir.relativize(p).toString().replace('\\', '/');
+                    return Optional.of(new StoredPoster(hash, localPath, mimeForExt(ext), Files.size(p), ext));
                 } catch (IOException ignored) {
                 }
             }
@@ -135,8 +128,7 @@ public class PosterStorageService {
                     .build();
 
             rateLimiter.acquire("poster");
-            HttpResponse<byte[]> resp = http.send(
-                    req, HttpResponse.BodyHandlers.ofByteArray());
+            HttpResponse<byte[]> resp = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
 
             if (resp.statusCode() != 200) {
                 throw new IllegalStateException("Poster HTTP " + resp.statusCode());
@@ -147,8 +139,8 @@ public class PosterStorageService {
                 throw new IllegalArgumentException("Некорректный размер постера");
             }
 
-            String mime = detectMime(bytes, resp.headers()
-                    .firstValue("Content-Type").orElse(null));
+            String mime =
+                    detectMime(bytes, resp.headers().firstValue("Content-Type").orElse(null));
             if (!ALLOWED_MIME.contains(mime)) {
                 throw new IllegalArgumentException("Недопустимый MIME: " + mime);
             }
@@ -185,12 +177,10 @@ public class PosterStorageService {
             return new StoredPoster(hash, localPath, mime, bytes.length, ext);
 
         } catch (IOException e) {
-            throw new UncheckedIOException(
-                    new IOException("Не удалось скачать постер: " + url, e));
+            throw new UncheckedIOException(new IOException("Не удалось скачать постер: " + url, e));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new UncheckedIOException(
-                    new IOException("Прервано скачивание постера: " + url, e));
+            throw new UncheckedIOException(new IOException("Прервано скачивание постера: " + url, e));
         }
     }
 
@@ -201,12 +191,9 @@ public class PosterStorageService {
         indexWriteLock.lock();
         try {
             Path tmp = Files.createTempFile(postersDir, "_url_index.", ".tmp");
-            mapper.writerWithDefaultPrettyPrinter()
-                    .writeValue(tmp.toFile(), urlToHash);
+            mapper.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), urlToHash);
             try {
-                Files.move(tmp, urlIndexFile,
-                        StandardCopyOption.REPLACE_EXISTING,
-                        StandardCopyOption.ATOMIC_MOVE);
+                Files.move(tmp, urlIndexFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException e) {
                 Files.move(tmp, urlIndexFile, StandardCopyOption.REPLACE_EXISTING);
             }
@@ -235,10 +222,10 @@ public class PosterStorageService {
 
     private static String mimeForExt(String ext) {
         return switch (ext) {
-            case "png"  -> "image/png";
-            case "gif"  -> "image/gif";
+            case "png" -> "image/png";
+            case "gif" -> "image/gif";
             case "webp" -> "image/webp";
-            default     -> "image/jpeg";
+            default -> "image/jpeg";
         };
     }
 
@@ -256,29 +243,32 @@ public class PosterStorageService {
 
     private static String extFor(String mime) {
         return switch (mime) {
-            case "image/png"  -> "png";
-            case "image/gif"  -> "gif";
+            case "image/png" -> "png";
+            case "image/gif" -> "gif";
             case "image/webp" -> "webp";
-            default           -> "jpg";
+            default -> "jpg";
         };
     }
 
     private static String detectMime(byte[] b, String header) {
-        if (b.length >= 8
-                && (b[0] & 0xFF) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') {
+        if (b.length >= 8 && (b[0] & 0xFF) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') {
             return "image/png";
         }
-        if (b.length >= 3
-                && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8) {
+        if (b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8) {
             return "image/jpeg";
         }
-        if (b.length >= 6
-                && b[0] == 'G' && b[1] == 'I' && b[2] == 'F') {
+        if (b.length >= 6 && b[0] == 'G' && b[1] == 'I' && b[2] == 'F') {
             return "image/gif";
         }
         if (b.length >= 12
-                && b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F'
-                && b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P') {
+                && b[0] == 'R'
+                && b[1] == 'I'
+                && b[2] == 'F'
+                && b[3] == 'F'
+                && b[8] == 'W'
+                && b[9] == 'E'
+                && b[10] == 'B'
+                && b[11] == 'P') {
             return "image/webp";
         }
         if (header != null) {

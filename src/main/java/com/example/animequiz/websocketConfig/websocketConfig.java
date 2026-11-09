@@ -28,8 +28,7 @@ public class websocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/AniQuiz")
-                .addInterceptors(new SameOriginHandshakeInterceptor());
+        registry.addEndpoint("/AniQuiz").addInterceptors(new SameOriginHandshakeInterceptor());
     }
 
     @Override
@@ -37,8 +36,7 @@ public class websocketConfig implements WebSocketMessageBrokerConfigurer {
         registration.interceptors(new ChannelInterceptor() {
             @Override
             public Message<?> preSend(Message<?> message, MessageChannel channel) {
-                StompHeaderAccessor accessor =
-                        MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+                StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
                 if (accessor == null || !StompCommand.SEND.equals(accessor.getCommand())) {
                     return message;
                 }

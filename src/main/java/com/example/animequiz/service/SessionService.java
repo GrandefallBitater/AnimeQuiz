@@ -1,12 +1,11 @@
 package com.example.animequiz.service;
 
 import com.example.animequiz.securityConfig.CustomUserDetailsImpl;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.session.SessionInformation;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 public class SessionService {

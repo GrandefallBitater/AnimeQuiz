@@ -2,11 +2,6 @@ package com.example.animequiz.service;
 
 import com.example.animequiz.exceptions.InvalidInputException;
 import jakarta.annotation.PostConstruct;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.*;
@@ -15,6 +10,10 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class StorageService {
@@ -22,8 +21,7 @@ public class StorageService {
     private static final Map<String, String> ALLOWED_IMAGE_TYPES = Map.of(
             "image/png", "png",
             "image/jpeg", "jpg",
-            "image/webp", "webp"
-    );
+            "image/webp", "webp");
     private static final long MAX_AVATAR_BYTES = 5L * 1024 * 1024;
     private final Path root;
     private final Path avatarsDir;
@@ -87,8 +85,7 @@ public class StorageService {
         try {
             if (!Files.isDirectory(avatarsDir)) return Optional.empty();
             try (Stream<Path> files = Files.list(avatarsDir)) {
-                return files
-                        .filter(p -> p.getFileName().toString().startsWith(safe + "."))
+                return files.filter(p -> p.getFileName().toString().startsWith(safe + "."))
                         .findFirst();
             } catch (IOException e) {
                 return Optional.empty();
@@ -101,14 +98,13 @@ public class StorageService {
     public void deleteAvatar(String safe) throws IOException {
         if (!Files.isDirectory(avatarsDir)) return;
         try (Stream<Path> files = Files.list(avatarsDir)) {
-            files.filter(p -> p.getFileName().toString().startsWith(safe + "."))
-                    .forEach(p -> {
-                        try {
-                            Files.deleteIfExists(p);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException("не удалось удалить аватар", e);
-                        }
-                    });
+            files.filter(p -> p.getFileName().toString().startsWith(safe + ".")).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException e) {
+                    throw new UncheckedIOException("не удалось удалить аватар", e);
+                }
+            });
         }
     }
 

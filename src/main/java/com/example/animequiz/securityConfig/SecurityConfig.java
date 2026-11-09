@@ -3,6 +3,8 @@ package com.example.animequiz.securityConfig;
 import com.example.animequiz.repository.AuthoritiesRepository;
 import com.example.animequiz.repository.UserRepository;
 import com.example.animequiz.service.CustomUserDetailsService;
+import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -23,9 +25,6 @@ import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler
 import org.springframework.security.web.firewall.HttpFirewall;
 import org.springframework.security.web.firewall.StrictHttpFirewall;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
-
-import java.nio.charset.StandardCharsets;
-import java.util.regex.Pattern;
 
 @Getter
 @Configuration
@@ -63,42 +62,35 @@ public class SecurityConfig {
         XorCsrfTokenRequestAttributeHandler requestHandler = new XorCsrfTokenRequestAttributeHandler();
         requestHandler.setCsrfRequestAttributeName("_csrf");
 
-        http
-                .csrf(csrf -> csrf
-                        .csrfTokenRequestHandler(requestHandler)
-                )
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.ALWAYS)
+        http.csrf(csrf -> csrf.csrfTokenRequestHandler(requestHandler))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.ALWAYS)
                         .maximumSessions(-1)
                         .sessionRegistry(sessionRegistry())
-                        .expiredUrl("/login?error=session")
-                )
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/register", "/auth/**").permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/profile/import").authenticated()
-                        .anyRequest().permitAll()
-                )
-                .formLogin(form -> form
-                        .loginPage("/login")
+                        .expiredUrl("/login?error=session"))
+                .authorizeHttpRequests(auth -> auth.requestMatchers("/login", "/register", "/auth/**")
+                        .permitAll()
+                        .requestMatchers("/admin/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/profile/import")
+                        .authenticated()
+                        .anyRequest()
+                        .permitAll())
+                .formLogin(form -> form.loginPage("/login")
                         .loginProcessingUrl("/login")
                         .defaultSuccessUrl("/", true)
                         .failureHandler(authenticationFailureHandler)
-                        .permitAll()
-                )
-                .logout(logout -> logout
-                        .logoutUrl("/logout")
+                        .permitAll())
+                .logout(logout -> logout.logoutUrl("/logout")
                         .logoutSuccessUrl("/login?logout")
                         .invalidateHttpSession(true)
-                        .deleteCookies("JSESSIONID")
-                );
+                        .deleteCookies("JSESSIONID"));
 
         return http.build();
     }
 
     @Bean
-    public UserDetailsService userDetailsService(UserRepository userRepository,
-                                                 AuthoritiesRepository authoritiesRepository) {
+    public UserDetailsService userDetailsService(
+            UserRepository userRepository, AuthoritiesRepository authoritiesRepository) {
         return new CustomUserDetailsService(userRepository, authoritiesRepository);
     }
 
@@ -109,8 +101,7 @@ public class SecurityConfig {
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider(
-            UserDetailsService userDetailsService,
-            PasswordEncoder passwordEncoder) {
+            UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
         authProvider.setUserDetailsService(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder);
@@ -126,5 +117,4 @@ public class SecurityConfig {
     public HttpSessionEventPublisher httpSessionEventPublisher() {
         return new HttpSessionEventPublisher();
     }
-
 }

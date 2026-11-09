@@ -8,19 +8,18 @@ import com.example.animequiz.exceptions.InvalidInputException;
 import com.example.animequiz.exceptions.NotFoundException;
 import com.example.animequiz.repository.UserRepository;
 import com.example.animequiz.validation.InputValidation;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -34,9 +33,11 @@ public class UserService {
     private final SessionService sessionService;
 
     @Autowired
-    public UserService(UserRepository userRepository,
-                       PasswordEncoder passwordEncoder, StorageService storageService,
-                       SessionService sessionService) {
+    public UserService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            StorageService storageService,
+            SessionService sessionService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.storageService = storageService;
@@ -48,7 +49,9 @@ public class UserService {
     }
 
     public void deleteUser(String username) {
-        User user = userRepository.findByUsername(username).orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+        User user = userRepository
+                .findByUsername(username)
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
         userRepository.deleteById(user.getUsername());
         sessionService.expireUserSessions(username);
         String key = "u_" + username;
@@ -67,8 +70,7 @@ public class UserService {
         username = InputValidation.normalizeUsername(userDto.username());
         String requestedDisplayName = userDto.displayName();
         displayName = InputValidation.normalizeDisplayName(
-                requestedDisplayName == null || requestedDisplayName.isBlank()
-                        ? username : requestedDisplayName);
+                requestedDisplayName == null || requestedDisplayName.isBlank() ? username : requestedDisplayName);
         if (userDto.password() == null || userDto.password().length() < 6) {
             throw new InvalidInputException("Пароль должен быть не короче 6 символов");
         }
@@ -97,7 +99,8 @@ public class UserService {
 
     @Transactional
     public void updateSelfProfile(UserController.SelfUpdateRequest request) {
-        User user = userRepository.findById(request.username())
+        User user = userRepository
+                .findById(request.username())
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         String displayName = InputValidation.normalizeDisplayName(request.displayName());
@@ -106,7 +109,8 @@ public class UserService {
 
     @Transactional
     public void updateUserByAdmin(UserController.AdminUpdateRequest request) {
-        User user = userRepository.findById(request.username())
+        User user = userRepository
+                .findById(request.username())
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         String displayName = InputValidation.normalizeDisplayName(request.displayName());
@@ -119,8 +123,8 @@ public class UserService {
             user.setAuthorities(new ArrayList<>());
         }
 
-        boolean alreadyHasRole = user.getAuthorities().stream()
-                .anyMatch(auth -> targetAuthority.equals(auth.getAuthority()));
+        boolean alreadyHasRole =
+                user.getAuthorities().stream().anyMatch(auth -> targetAuthority.equals(auth.getAuthority()));
 
         if (!alreadyHasRole) {
             user.getAuthorities().clear();

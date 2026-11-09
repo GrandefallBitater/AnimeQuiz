@@ -1,7 +1,6 @@
 package com.example.animequiz.validation;
 
 import com.example.animequiz.exceptions.InvalidInputException;
-
 import java.util.regex.Pattern;
 
 public final class InputValidation {
@@ -16,8 +15,7 @@ public final class InputValidation {
     private static final Pattern FORBIDDEN_DISPLAY_CHARS = Pattern.compile("[<>\\p{Cntrl}]");
     private static final Pattern CONTROL_CHARS = Pattern.compile("\\p{Cntrl}");
 
-    private InputValidation() {
-    }
+    private InputValidation() {}
 
     public static String normalizeUsername(String raw) {
         String value = raw == null ? "" : raw.trim();
@@ -25,9 +23,8 @@ public final class InputValidation {
             throw new InvalidInputException("Никнейм не может быть пустым");
         }
         if (!USERNAME.matcher(value).matches()) {
-            throw new InvalidInputException(
-                    "Никнейм: от " + USERNAME_MIN + " до " + USERNAME_MAX
-                            + " символов, только буквы, цифры, точка, дефис и подчёркивание");
+            throw new InvalidInputException("Никнейм: от " + USERNAME_MIN + " до " + USERNAME_MAX
+                    + " символов, только буквы, цифры, точка, дефис и подчёркивание");
         }
         return value;
     }

@@ -1,8 +1,8 @@
 package com.example.animequiz.securityConfig; // или .security / .domain
 
 import com.example.animequiz.Interfaces.CustomUserDetails;
-import org.springframework.security.core.GrantedAuthority;
 import java.util.Collection;
+import org.springframework.security.core.GrantedAuthority;
 
 public class CustomUserDetailsImpl implements CustomUserDetails {
 
@@ -12,9 +12,12 @@ public class CustomUserDetailsImpl implements CustomUserDetails {
     private final Boolean enabled;
     private final Collection<? extends GrantedAuthority> authorities;
 
-    public CustomUserDetailsImpl(String username, String password,
-                                 String displayName, Collection<? extends GrantedAuthority> authorities,
-                                 Boolean enabled) {
+    public CustomUserDetailsImpl(
+            String username,
+            String password,
+            String displayName,
+            Collection<? extends GrantedAuthority> authorities,
+            Boolean enabled) {
         this.username = username;
         this.password = password;
         this.displayName = displayName;
@@ -43,11 +46,22 @@ public class CustomUserDetailsImpl implements CustomUserDetails {
     }
 
     @Override
-    public boolean isAccountNonExpired() { return true; }
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
     @Override
-    public boolean isAccountNonLocked() { return true; }
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
     @Override
-    public boolean isCredentialsNonExpired() { return true; }
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
     @Override
-    public boolean isEnabled() { return this.enabled; }
+    public boolean isEnabled() {
+        return this.enabled;
+    }
 }

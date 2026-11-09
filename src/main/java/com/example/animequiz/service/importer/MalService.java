@@ -1,16 +1,11 @@
 package com.example.animequiz.service.importer;
 
-import com.example.animequiz.exceptions.ExternalServiceException;
 import com.example.animequiz.exceptions.InvalidInputException;
 import com.example.animequiz.exceptions.NotFoundException;
 import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.ratelimit.SourceRateLimiter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -20,6 +15,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
@@ -39,7 +37,8 @@ public class MalService implements AnimeListImporter {
     public MalService(
             @Value("${app.mal.web-base-url:https://myanimelist.net}") String webBaseUrl,
             @Value("${app.mal.base-url:https://api.myanimelist.net/v2}") String apiBaseUrl,
-            @Value("${app.mal.client-id:}") String clientId, SourceRateLimiter rateLimiter) {
+            @Value("${app.mal.client-id:}") String clientId,
+            SourceRateLimiter rateLimiter) {
         this.webBaseUrl = webBaseUrl.replaceAll("/+$", "");
         this.apiBaseUrl = apiBaseUrl.replaceAll("/+$", "");
         this.clientId = clientId;
@@ -53,7 +52,10 @@ public class MalService implements AnimeListImporter {
         }
     }
 
-    @Override public String sourceName() { return "myanimelist"; }
+    @Override
+    public String sourceName() {
+        return "myanimelist";
+    }
 
     @Override
     public ImportResult importList(String nickname) {
@@ -77,23 +79,20 @@ public class MalService implements AnimeListImporter {
                         mapStatus(item.path("status").asInt(0), rewatching),
                         item.path("score").asInt(0),
                         item.path("num_watched_episodes").asInt(0),
-                        rewatching ? 1 : 0
-                ));
+                        rewatching ? 1 : 0));
             }
             if (data.size() < PAGE_SIZE) break;
             sleep(300);
         }
         if (entries.isEmpty()) {
-            throw new NotFoundException(
-                    "Пользователь не найден на MAL");
+            throw new NotFoundException("Пользователь не найден на MAL");
         }
         log.info("MAL: {} → {} записей", clean, entries.size());
         return new ImportResult(0L, clean, entries.size(), entries);
     }
 
     private JsonNode fetchPage(String username, int offset) {
-        String url = webBaseUrl + "/animelist/" + enc(username)
-                + "/load.json?offset=" + offset + "&status=7";
+        String url = webBaseUrl + "/animelist/" + enc(username) + "/load.json?offset=" + offset + "&status=7";
         try {
             rateLimiter.acquire("mal");
             HttpRequest req = HttpRequest.newBuilder(URI.create(url))
@@ -102,12 +101,15 @@ public class MalService implements AnimeListImporter {
                     .header("Accept", "application/json")
                     .header("X-Requested-With", "XMLHttpRequest")
                     .header("Referer", webBaseUrl + "/animelist/" + enc(username))
-                    .GET().build();
-            HttpResponse<String> resp = http.send(req,
-                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                    .GET()
+                    .build();
+            HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             int code = resp.statusCode();
             if (code == 403 || code == 404) return null;
-            if (code != 200) { log.warn("MAL web {}: {}", code, url); return null; }
+            if (code != 200) {
+                log.warn("MAL web {}: {}", code, url);
+                return null;
+            }
             return mapper.readTree(resp.body());
         } catch (Exception e) {
             log.warn("Ошибка запроса к MAL: {}", e.toString());
@@ -150,9 +152,9 @@ public class MalService implements AnimeListImporter {
                     .timeout(Duration.ofSeconds(15))
                     .header("X-MAL-CLIENT-ID", clientId)
                     .header("Accept", "application/json")
-                    .GET().build();
-            HttpResponse<String> resp = http.send(req,
-                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                    .GET()
+                    .build();
+            HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (resp.statusCode() != 200) return null;
             return mapper.readTree(resp.body());
         } catch (Exception e) {
@@ -193,8 +195,8 @@ public class MalService implements AnimeListImporter {
         if (s == null) return null;
         return switch (s) {
             case "currently_airing" -> "ongoing";
-            case "finished_airing"  -> "released";
-            case "not_yet_aired"    -> "anons";
+            case "finished_airing" -> "released";
+            case "not_yet_aired" -> "anons";
             default -> null;
         };
     }
@@ -204,6 +206,10 @@ public class MalService implements AnimeListImporter {
     }
 
     private static void sleep(long ms) {
-        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

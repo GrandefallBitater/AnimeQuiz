@@ -1,10 +1,10 @@
 package com.example.animequiz.service;
 
-import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import org.springframework.stereotype.Service;
 
 @Service
 public class AnimeQuizService {
@@ -15,8 +15,7 @@ public class AnimeQuizService {
             "https://picsum.photos/seed/anime2/300/400",
             "https://picsum.photos/seed/anime3/300/400",
             "https://picsum.photos/seed/anime4/300/400",
-            "https://picsum.photos/seed/anime5/300/400"
-    );
+            "https://picsum.photos/seed/anime5/300/400");
 
     public List<String> getRandomImages() {
         List<String> shuffled = new ArrayList<>(ANIME_IMAGES);
@@ -24,4 +23,3 @@ public class AnimeQuizService {
         return shuffled.subList(0, Math.min(2, shuffled.size()));
     }
 }
-

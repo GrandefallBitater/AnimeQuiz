@@ -7,10 +7,6 @@ import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.ratelimit.SourceRateLimiter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -23,6 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
@@ -41,7 +40,8 @@ public class YummyAnimeService implements AnimeListImporter {
     private final Map<String, Long> nickCache = new ConcurrentHashMap<>();
 
     public YummyAnimeService(
-            SourceRateLimiter rateLimiter, @Value("${app.yummy.base-url:https://api.yani.tv}") String baseUrl,
+            SourceRateLimiter rateLimiter,
+            @Value("${app.yummy.base-url:https://api.yani.tv}") String baseUrl,
             @Value("${app.yummy.app-token:}") String appToken) {
         this.rateLimiter = rateLimiter;
         this.baseUrl = baseUrl.replaceAll("/+$", "");
@@ -66,8 +66,7 @@ public class YummyAnimeService implements AnimeListImporter {
         JsonNode root = getJson("/users/" + userId + "/lists");
         JsonNode arr = root.path("response");
         if (!arr.isArray() || arr.isEmpty()) {
-            throw new NotFoundException(
-                    "Пользователь не найден на YummyAnime");
+            throw new NotFoundException("Пользователь не найден на YummyAnime");
         }
 
         List<RatingEntry> entries = new ArrayList<>(arr.size());
@@ -82,19 +81,11 @@ public class YummyAnimeService implements AnimeListImporter {
             JsonNode userListNode = item.path("user").path("list").path("list");
             int listId = userListNode.path("id").asInt(-1);
             Integer rating = item.path("user").hasNonNull("rating")
-                    ? item.path("user").get("rating").asInt() : null;
+                    ? item.path("user").get("rating").asInt()
+                    : null;
 
             entries.add(new RatingEntry(
-                    animeId,
-                    shiki,
-                    mal,
-                    animeId,
-                    String.valueOf(animeId),
-                    mapStatus(listId),
-                    rating,
-                    null,
-                    null
-            ));
+                    animeId, shiki, mal, animeId, String.valueOf(animeId), mapStatus(listId), rating, null, null));
         }
         log.info("YummyAnime: {} → {} записей", clean, entries.size());
         return new ImportResult(userId, clean, entries.size(), entries);
@@ -120,7 +111,8 @@ public class YummyAnimeService implements AnimeListImporter {
 
     private List<AnimeCatalogService.AnimePatch> fetchByIds(String param, List<Long> ids) {
         if (ids.isEmpty()) return List.of();
-        String joined = ids.stream().map(String::valueOf).reduce((a, b) -> a + "," + b).orElse("");
+        String joined =
+                ids.stream().map(String::valueOf).reduce((a, b) -> a + "," + b).orElse("");
         JsonNode root = getJson("/anime?" + param + "=" + joined + "&limit=100");
         JsonNode arr = root.path("response");
         if (!arr.isArray()) return List.of();
@@ -152,7 +144,8 @@ public class YummyAnimeService implements AnimeListImporter {
                 .russian(russian)
                 .title(titleField)
                 .kind(normalizeKind(anime.path("type").path("alias").asText(null)))
-                .airingStatus(normalizeAiring(anime.path("anime_status").path("alias").asText(null)))
+                .airingStatus(
+                        normalizeAiring(anime.path("anime_status").path("alias").asText(null)))
                 .totalEpisodes(anime.path("episodes").path("count").asInt(0))
                 .url("https://yummyani.me/catalog/item/"
                         + anime.path("anime_url").asText() + "-" + yummyId)
@@ -207,8 +200,7 @@ public class YummyAnimeService implements AnimeListImporter {
     private static String normalizeKind(String alias) {
         if (alias == null || alias.isBlank()) return null;
         String lower = alias.toLowerCase();
-        if (lower.equals("unknown") || lower.equals("undefined")
-                || lower.equals("null") || lower.equals("-")) {
+        if (lower.equals("unknown") || lower.equals("undefined") || lower.equals("null") || lower.equals("-")) {
             return null;
         }
         return lower;
@@ -241,21 +233,28 @@ public class YummyAnimeService implements AnimeListImporter {
                     .header("X-Application", appToken)
                     .header("Accept", "application/json")
                     .header("Lang", "ru")
-                    .GET().build();
-            HttpResponse<String> resp = http.send(req,
-                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                    .GET()
+                    .build();
+            HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (resp.statusCode() == 404) {
                 throw new NotFoundException("Пользователь не найден на YummyAnime");
             }
             if (resp.statusCode() != 200) {
-                log.error("YummyAnime вернул ошибку. Статус: {}. URL: {}. Ответ: {}",
-                        resp.statusCode(), url, resp.body());
+                log.error(
+                        "YummyAnime вернул ошибку. Статус: {}. URL: {}. Ответ: {}",
+                        resp.statusCode(),
+                        url,
+                        resp.body());
                 throw new ExternalServiceException("YummyAnime вернул ошибку");
             }
             return mapper.readTree(resp.body());
         } catch (IOException e) {
-            log.error("YummyAnime IOException для URL: {}. Сообщение: {}. Причина: {}",
-                    url, e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "нет", e);
+            log.error(
+                    "YummyAnime IOException для URL: {}. Сообщение: {}. Причина: {}",
+                    url,
+                    e.getMessage(),
+                    e.getCause() != null ? e.getCause().getMessage() : "нет",
+                    e);
             throw new ExternalServiceException("YummyAnime недоступен", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

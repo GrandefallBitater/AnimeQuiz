@@ -6,7 +6,7 @@ public class ExternalServiceException extends RuntimeException {
         super(message);
     }
 
-    public  ExternalServiceException(String message, Throwable cause) {
+    public ExternalServiceException(String message, Throwable cause) {
         super(message, cause);
     }
 }

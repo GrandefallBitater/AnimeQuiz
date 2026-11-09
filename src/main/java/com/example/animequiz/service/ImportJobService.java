@@ -6,18 +6,17 @@ import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.enrichment.EnrichmentWorker;
 import com.example.animequiz.service.importer.ShikimoriService;
 import com.example.animequiz.service.importer.YummyAnimeService;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -63,22 +62,24 @@ public class ImportJobService {
         try {
             update(job, "enumeration", 0, null, "Перечисление каталога Shikimori...");
             List<AnimeCatalogService.AnimePatch> catalogPatches = shikimori.fetchSiteCatalog();
-            update(job, "enumeration", 0, catalogPatches.size(),
-                    "Сохранение " + catalogPatches.size() + " тайтлов...");
+            update(job, "enumeration", 0, catalogPatches.size(), "Сохранение " + catalogPatches.size() + " тайтлов...");
 
             int saved = 0;
             for (AnimeCatalogService.AnimePatch p : catalogPatches) {
                 catalog.upsert(p);
                 saved++;
                 if (saved % 100 == 0) {
-                    update(job, "enumeration", saved, catalogPatches.size(),
+                    update(
+                            job,
+                            "enumeration",
+                            saved,
+                            catalogPatches.size(),
                             "Сохранено " + saved + " / " + catalogPatches.size());
                 }
             }
             update(job, "enumeration", saved, catalogPatches.size(), "Каталог Shikimori загружен");
 
-            update(job, "yummy", 0, catalogPatches.size(),
-                    "Обогащение через YummyAnime...");
+            update(job, "yummy", 0, catalogPatches.size(), "Обогащение через YummyAnime...");
             List<Long> shikiIds = catalogPatches.stream()
                     .map(AnimeCatalogService.AnimePatch::shikimoriId)
                     .filter(java.util.Objects::nonNull)
@@ -95,13 +96,16 @@ public class ImportJobService {
                     log.warn("Yummy batch {} fail: {}", i / batchSize, e.toString());
                 }
                 yummyProcessed += batch.size();
-                update(job, "yummy", yummyProcessed, shikiIds.size(),
+                update(
+                        job,
+                        "yummy",
+                        yummyProcessed,
+                        shikiIds.size(),
                         "YummyAnime: " + yummyProcessed + " / " + shikiIds.size());
                 saveCheckpoint(job, "yummyOffset", yummyProcessed);
             }
 
-            update(job, "posters", 0, null,
-                    "Запуск фонового скачивания постеров...");
+            update(job, "posters", 0, null, "Запуск фонового скачивания постеров...");
             enrichmentWorker.trigger();
 
             finish(job, "Импорт завершён. Постеры догружаются в фоне.");
@@ -111,8 +115,7 @@ public class ImportJobService {
         }
     }
 
-    private void update(ImportJob job, String stage, int processed,
-                        Integer total, String message) {
+    private void update(ImportJob job, String stage, int processed, Integer total, String message) {
         ImportJob fresh = jobRepo.findById(job.getId()).orElseThrow();
         fresh.setStage(stage);
         fresh.setProcessedCount(processed);
@@ -123,8 +126,7 @@ public class ImportJobService {
 
     private void saveCheckpoint(ImportJob job, String key, Object value) {
         ImportJob fresh = jobRepo.findById(job.getId()).orElseThrow();
-        Map<String, Object> cp = fresh.getCheckpoint() == null
-                ? new HashMap<>() : new HashMap<>(fresh.getCheckpoint());
+        Map<String, Object> cp = fresh.getCheckpoint() == null ? new HashMap<>() : new HashMap<>(fresh.getCheckpoint());
         cp.put(key, value);
         fresh.setCheckpoint(cp);
         jobRepo.save(fresh);

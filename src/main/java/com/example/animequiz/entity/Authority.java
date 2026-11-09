@@ -8,9 +8,9 @@ import lombok.ToString;
 @Data
 @NoArgsConstructor
 @Entity
-@Table(name = "authorities", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"username", "authority"})
-})
+@Table(
+        name = "authorities",
+        uniqueConstraints = {@UniqueConstraint(columnNames = {"username", "authority"})})
 public class Authority implements org.springframework.security.core.GrantedAuthority {
 
     @Id
@@ -30,4 +30,3 @@ public class Authority implements org.springframework.security.core.GrantedAutho
         this.authority = authority;
     }
 }
-

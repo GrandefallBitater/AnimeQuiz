@@ -9,6 +9,10 @@ import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.importer.MalService;
 import com.example.animequiz.service.importer.ShikimoriService;
 import com.example.animequiz.service.importer.YummyAnimeService;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -17,11 +21,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
@@ -48,7 +47,8 @@ public class EnrichmentWorker {
 
     @Scheduled(fixedDelayString = "PT15S")
     public void tick() {
-        if (jobRepo.findFirstByTypeAndStateOrderByIdDesc("site_import", "running").isPresent()) {
+        if (jobRepo.findFirstByTypeAndStateOrderByIdDesc("site_import", "running")
+                .isPresent()) {
             return;
         }
         boolean triggered = triggerRequested.getAndSet(false);
@@ -57,12 +57,15 @@ public class EnrichmentWorker {
             triggerRequested.set(true);
             return;
         }
-        try { processBatch(); } finally { running.set(false); }
+        try {
+            processBatch();
+        } finally {
+            running.set(false);
+        }
     }
 
     private void processBatch() {
-        List<Anime> queue = animeRepository.findEnrichQueue(
-                Instant.now(), PageRequest.of(0, BATCH_SIZE));
+        List<Anime> queue = animeRepository.findEnrichQueue(Instant.now(), PageRequest.of(0, BATCH_SIZE));
         if (queue.isEmpty()) return;
 
         log.info("EnrichmentWorker: обрабатываю {} тайтлов", queue.size());
@@ -81,8 +84,8 @@ public class EnrichmentWorker {
         Anime a = animeRepository.findById(animeId).orElse(null);
         if (a == null) return;
 
-        Set<String> sources = a.getEnrichedSources() == null
-                ? new HashSet<>() : new HashSet<>(Arrays.asList(a.getEnrichedSources()));
+        Set<String> sources =
+                a.getEnrichedSources() == null ? new HashSet<>() : new HashSet<>(Arrays.asList(a.getEnrichedSources()));
 
         AnimeCatalogService.AnimePatch patch = null;
 
@@ -91,12 +94,10 @@ public class EnrichmentWorker {
                 patch = shikimori.fetchFull(a.getShikimoriId());
                 sources.add("shikimori");
             } catch (NotFoundException e) {
-                log.info("Shikimori 404 animeId={} shikiId={} — пропускаю",
-                        a.getId(), a.getShikimoriId());
+                log.info("Shikimori 404 animeId={} shikiId={} — пропускаю", a.getId(), a.getShikimoriId());
                 sources.add("shikimori");
             } catch (Exception e) {
-                log.warn("Shikimori fail animeId={} shikiId={}: {}",
-                        a.getId(), a.getShikimoriId(), e.toString());
+                log.warn("Shikimori fail animeId={} shikiId={}: {}", a.getId(), a.getShikimoriId(), e.toString());
                 markFailedInPlace(a, "shikimori: " + e.getMessage());
                 return;
             }
@@ -112,19 +113,20 @@ public class EnrichmentWorker {
                     } catch (NotFoundException e) {
                         log.info("Yummy 404 animeId={} yummyId={}", a.getId(), a.getYummyId());
                     } catch (Exception e) {
-                        log.warn("Yummy fetchFull fail animeId={} yummyId={}: {}",
-                                a.getId(), a.getYummyId(), e.toString());
+                        log.warn(
+                                "Yummy fetchFull fail animeId={} yummyId={}: {}",
+                                a.getId(),
+                                a.getYummyId(),
+                                e.toString());
                     }
                 }
 
                 if (y == null && a.getShikimoriId() != null) {
-                    List<AnimeCatalogService.AnimePatch> list =
-                            yummy.fetchByShikimoriIds(List.of(a.getShikimoriId()));
+                    List<AnimeCatalogService.AnimePatch> list = yummy.fetchByShikimoriIds(List.of(a.getShikimoriId()));
                     if (!list.isEmpty()) y = list.get(0);
                 }
                 if (y == null && a.getMalId() != null) {
-                    List<AnimeCatalogService.AnimePatch> list =
-                            yummy.fetchByMalIds(List.of(a.getMalId()));
+                    List<AnimeCatalogService.AnimePatch> list = yummy.fetchByMalIds(List.of(a.getMalId()));
                     if (!list.isEmpty()) y = list.get(0);
                 }
 
@@ -154,7 +156,9 @@ public class EnrichmentWorker {
         a = animeRepository.findById(animeId).orElse(null);
         if (a == null) return;
 
-        if (a.getPosterHash() == null && a.getPosterUrl() != null && !a.getPosterUrl().isBlank()) {
+        if (a.getPosterHash() == null
+                && a.getPosterUrl() != null
+                && !a.getPosterUrl().isBlank()) {
             try {
                 PosterStorageService.StoredPoster stored = posterStorage.downloadAndStore(a.getPosterUrl());
                 a.setPosterHash(stored.hash());
@@ -225,18 +229,23 @@ public class EnrichmentWorker {
                 .totalEpisodes(a.totalEpisodes() != null ? a.totalEpisodes() : b.totalEpisodes())
                 .url(firstNonBlank(a.url(), b.url()))
                 .posterUrl(firstNonBlank(a.posterUrl(), b.posterUrl()))
-                .completeness(rank(a.completeness()) >= rank(b.completeness())
-                        ? a.completeness() : b.completeness())
+                .completeness(rank(a.completeness()) >= rank(b.completeness()) ? a.completeness() : b.completeness())
                 .build();
     }
 
-    private static <T> T firstNonNull(T a, T b) { return a != null ? a : b; }
+    private static <T> T firstNonNull(T a, T b) {
+        return a != null ? a : b;
+    }
+
     private static String firstNonBlank(String a, String b) {
         return (a != null && !a.isBlank()) ? a : b;
     }
+
     private static int rank(String c) {
         return switch (c == null ? "stub" : c) {
-            case "full" -> 3; case "partial" -> 2; default -> 1;
+            case "full" -> 3;
+            case "partial" -> 2;
+            default -> 1;
         };
     }
 }

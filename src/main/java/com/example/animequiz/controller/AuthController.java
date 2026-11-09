@@ -38,9 +38,7 @@ public class AuthController {
     }
 
     @GetMapping("/register")
-    public String registerPage(
-            @RequestParam(value = "message", required = false) String message,
-            Model model) {
+    public String registerPage(@RequestParam(value = "message", required = false) String message, Model model) {
 
         if (message != null) {
             model.addAttribute("infoMessage", message);

@@ -8,10 +8,6 @@ import com.example.animequiz.service.ratelimit.SourceRateLimiter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -23,6 +19,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntFunction;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
@@ -45,7 +44,8 @@ public class ShikimoriService implements AnimeListImporter {
     private final String userAgent;
 
     public ShikimoriService(
-            SourceRateLimiter rateLimiter, @Value("${app.shikimori.base-url}") String baseUrl,
+            SourceRateLimiter rateLimiter,
+            @Value("${app.shikimori.base-url}") String baseUrl,
             @Value("${app.shikimori.site-origin}") String siteOrigin,
             @Value("${app.shikimori.user-agent}") String userAgent) {
         this.rateLimiter = rateLimiter;
@@ -54,7 +54,10 @@ public class ShikimoriService implements AnimeListImporter {
         this.userAgent = userAgent;
     }
 
-    @Override public String sourceName() { return "shikimori"; }
+    @Override
+    public String sourceName() {
+        return "shikimori";
+    }
 
     @Override
     public ImportResult importList(String nickname) {
@@ -68,15 +71,16 @@ public class ShikimoriService implements AnimeListImporter {
         long userId = user.get("id").asLong();
         String resolvedNick = user.path("nickname").asText(clean);
 
-        ArrayNode rates = fetchAllPages(page -> getJson(
-                "/users/" + userId + "/anime_rates?limit=" + PAGE_LIMIT + "&page=" + page));
+        ArrayNode rates = fetchAllPages(
+                page -> getJson("/users/" + userId + "/anime_rates?limit=" + PAGE_LIMIT + "&page=" + page));
 
         List<RatingEntry> entries = new ArrayList<>(rates.size());
         for (JsonNode rate : rates) {
             JsonNode anime = rate.path("anime");
             long animeId = anime.path("id").asLong();
             Long malId = anime.hasNonNull("myanimelist_id")
-                    ? anime.get("myanimelist_id").asLong() : null;
+                    ? anime.get("myanimelist_id").asLong()
+                    : null;
             if (malId != null && malId == 0) malId = null;
 
             entries.add(new RatingEntry(
@@ -88,8 +92,7 @@ public class ShikimoriService implements AnimeListImporter {
                     mapStatus(rate.path("status").asText(null)),
                     rate.path("score").asInt(0),
                     rate.path("episodes").asInt(0),
-                    rate.path("rewatches").asInt(0)
-            ));
+                    rate.path("rewatches").asInt(0)));
         }
 
         log.info("Shikimori: {} → {} записей", resolvedNick, entries.size());
@@ -101,9 +104,9 @@ public class ShikimoriService implements AnimeListImporter {
         return switch (shiki) {
             case "watching", "rewatching" -> "watching";
             case "completed" -> "completed";
-            case "on_hold"   -> "on_hold";
-            case "dropped"   -> "dropped";
-            case "planned"   -> "planned";
+            case "on_hold" -> "on_hold";
+            case "dropped" -> "dropped";
+            case "planned" -> "planned";
             default -> null;
         };
     }
@@ -117,7 +120,8 @@ public class ShikimoriService implements AnimeListImporter {
         JsonNode imageNode = detail.path("image");
         String posterUrl = pickImageUrl(imageNode);
         Long malId = detail.hasNonNull("myanimelist_id")
-                ? detail.get("myanimelist_id").asLong() : null;
+                ? detail.get("myanimelist_id").asLong()
+                : null;
         if (malId != null && malId == 0) malId = null;
 
         String name = asTextOrNull(detail, "name");
@@ -139,14 +143,14 @@ public class ShikimoriService implements AnimeListImporter {
     }
 
     public List<AnimeCatalogService.AnimePatch> fetchSiteCatalog() {
-        ArrayNode titles = fetchAllPages(page -> getJson(
-                "/animes?limit=" + PAGE_LIMIT + "&page=" + page));
+        ArrayNode titles = fetchAllPages(page -> getJson("/animes?limit=" + PAGE_LIMIT + "&page=" + page));
         List<AnimeCatalogService.AnimePatch> result = new ArrayList<>(titles.size());
         for (JsonNode anime : titles) {
             long id = anime.path("id").asLong();
             String posterUrl = pickImageUrl(anime.path("image"));
             Long malId = anime.hasNonNull("myanimelist_id")
-                    ? anime.get("myanimelist_id").asLong() : null;
+                    ? anime.get("myanimelist_id").asLong()
+                    : null;
             if (malId != null && malId == 0) malId = null;
 
             String name = asTextOrNull(anime, "name");
@@ -183,7 +187,7 @@ public class ShikimoriService implements AnimeListImporter {
 
     private static String pickImageUrl(JsonNode imageNode) {
         if (imageNode == null || imageNode.isMissingNode() || imageNode.isNull()) return null;
-        for (String f : new String[]{"original", "preview", "x96", "x48"}) {
+        for (String f : new String[] {"original", "preview", "x96", "x48"}) {
             String v = imageNode.path(f).asText(null);
             if (v != null && !v.isBlank() && !v.contains("missing_")) return v;
         }
@@ -220,17 +224,28 @@ public class ShikimoriService implements AnimeListImporter {
                         .timeout(Duration.ofSeconds(20))
                         .header("User-Agent", userAgent)
                         .header("Accept", "application/json")
-                        .GET().build();
-                HttpResponse<String> resp = http.send(req,
-                        HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                        .GET()
+                        .build();
+                HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
                 int code = resp.statusCode();
                 if (code == 404) return null;
-                if (code == 429) { sleep(RETRY_DELAY_MS * attempt * 2L); continue; }
-                if (code >= 500) { sleep(RETRY_DELAY_MS * attempt); continue; }
-                if (code == 403) {throw new NotFoundException("Аккаунт скрыт"); }
-                if (code != 200)  {
-                    log.error("Shikimori вернул ошибку. Статус: {}. URL: {}. Ответ: {}",
-                            resp.statusCode(), url, resp.body());
+                if (code == 429) {
+                    sleep(RETRY_DELAY_MS * attempt * 2L);
+                    continue;
+                }
+                if (code >= 500) {
+                    sleep(RETRY_DELAY_MS * attempt);
+                    continue;
+                }
+                if (code == 403) {
+                    throw new NotFoundException("Аккаунт скрыт");
+                }
+                if (code != 200) {
+                    log.error(
+                            "Shikimori вернул ошибку. Статус: {}. URL: {}. Ответ: {}",
+                            resp.statusCode(),
+                            url,
+                            resp.body());
                     throw new ExternalServiceException("Shikimori вернул ошибку");
                 }
                 return mapper.readTree(resp.body());
@@ -250,6 +265,10 @@ public class ShikimoriService implements AnimeListImporter {
     }
 
     private static void sleep(long ms) {
-        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

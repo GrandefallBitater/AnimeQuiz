@@ -21,13 +21,9 @@ public class AuthService {
                 updatedUser.getPassword(),
                 updatedUser.getDisplayName(),
                 updatedUser.getAuthorities(),
-                updatedUser.isEnabled()
-        );
+                updatedUser.isEnabled());
         return new UsernamePasswordAuthenticationToken(
-                newDetails,
-                currentAuth.getCredentials(),
-                updatedUser.getAuthorities()
-        );
+                newDetails, currentAuth.getCredentials(), updatedUser.getAuthorities());
     }
 
     public void updateSecurityContext(UsernamePasswordAuthenticationToken newAuth, HttpServletRequest request) {
@@ -36,10 +32,7 @@ public class AuthService {
 
         HttpSession session = request.getSession(false);
         if (session != null) {
-            session.setAttribute(
-                    HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                    context
-            );
+            session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
         }
     }
 
@@ -48,7 +41,6 @@ public class AuthService {
     }
 
     public static boolean isAdmin(Authentication auth) {
-        return auth != null && auth.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        return auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
     }
 }

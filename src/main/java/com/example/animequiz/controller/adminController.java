@@ -2,17 +2,16 @@ package com.example.animequiz.controller;
 
 import com.example.animequiz.entity.ImportJob;
 import com.example.animequiz.service.ImportJobService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
-
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
 
 @Controller
 public class adminController {
@@ -26,7 +25,9 @@ public class adminController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/admin")
-    public String adminPage() { return "admin"; }
+    public String adminPage() {
+        return "admin";
+    }
 
     @ResponseBody
     @PreAuthorize("hasRole('ADMIN')")
@@ -34,10 +35,7 @@ public class adminController {
     public Map<String, Object> startImport() {
         try {
             Long jobId = jobService.startSiteImport();
-            return Map.of(
-                    "message", "Импорт запущен",
-                    "jobId", jobId
-            );
+            return Map.of("message", "Импорт запущен", "jobId", jobId);
         } catch (IllegalStateException e) {
             return Map.of("message", e.getMessage(), "running", true);
         }
@@ -85,8 +83,7 @@ public class adminController {
             return Map.of("message", "Не выполнялся");
         }
         Instant instant = last.get().getFinishedAt();
-        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-dd-MM")
-                .withZone(ZoneId.of("UTC"));
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-dd-MM").withZone(ZoneId.of("UTC"));
         return Map.of("message", fmt.format(instant));
     }
 }

@@ -7,13 +7,12 @@ import com.example.animequiz.repository.UserAnimeRepository;
 import com.example.animequiz.repository.UserImportRepository;
 import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.importer.AnimeListImporter;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.text.Collator;
 import java.util.*;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -24,9 +23,7 @@ public class UserListService {
     private final UserImportRepository userImportRepository;
 
     @Transactional
-    public void replaceUserList(String username,
-                                String source,
-                                AnimeListImporter.ImportResult result) {
+    public void replaceUserList(String username, String source, AnimeListImporter.ImportResult result) {
         userAnimeRepository.deleteAllByUserId(username);
 
         Set<Long> shikiIds = result.ratings().stream()
@@ -39,7 +36,7 @@ public class UserListService {
                 .collect(Collectors.toSet());
 
         Map<Long, Anime> byShiki = catalog.batchLookupByShikimoriIds(shikiIds);
-        Map<Long, Anime> byMal   = catalog.batchLookupByMalIds(malIds);
+        Map<Long, Anime> byMal = catalog.batchLookupByMalIds(malIds);
         Map<Long, UserAnime> byAnimeId = new LinkedHashMap<>();
 
         for (AnimeListImporter.RatingEntry r : result.ratings()) {
@@ -47,14 +44,13 @@ public class UserListService {
             if (r.shikimoriId() != null) anime = byShiki.get(r.shikimoriId());
             if (anime == null && r.malId() != null) anime = byMal.get(r.malId());
             if (anime == null) {
-                anime = catalog.upsert(
-                        AnimeCatalogService.AnimePatch.builder()
-                                .shikimoriId(r.shikimoriId())
-                                .malId(r.malId())
-                                .yummyId(r.yummyId())
-                                .title("Unknown #" + r.sourceAnimeId())
-                                .completeness("stub")
-                                .build());
+                anime = catalog.upsert(AnimeCatalogService.AnimePatch.builder()
+                        .shikimoriId(r.shikimoriId())
+                        .malId(r.malId())
+                        .yummyId(r.yummyId())
+                        .title("Unknown #" + r.sourceAnimeId())
+                        .completeness("stub")
+                        .build());
             }
 
             UserAnime ua = new UserAnime();
@@ -91,15 +87,20 @@ public class UserListService {
     }
 
     @Transactional(readOnly = true)
-    public UserListPage getUserListPage(String username, int page, int size, String query,
-                                        Collection<String> statuses, boolean onlyLocal, String sort) {
+    public UserListPage getUserListPage(
+            String username,
+            int page,
+            int size,
+            String query,
+            Collection<String> statuses,
+            boolean onlyLocal,
+            String sort) {
         LoadedViews loaded = loadViews(username);
 
         String q = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
         List<UserAnimeView> filtered = loaded.ready().stream()
                 .filter(v -> !onlyLocal || hasPoster(v))
-                .filter(v -> statuses == null || statuses.isEmpty()
-                        || statuses.contains(v.status()))
+                .filter(v -> statuses == null || statuses.isEmpty() || statuses.contains(v.status()))
                 .filter(v -> q.isEmpty() || matchesQuery(v, q))
                 .collect(Collectors.toCollection(ArrayList::new));
 
@@ -112,15 +113,22 @@ public class UserListService {
         int to = Math.min(from + safeSize, filteredCount);
         List<UserAnimeView> slice = filtered.subList(from, to);
 
-        return new UserListPage(slice, safePage, safeSize, loaded.total(),
-                loaded.ready().size(), loaded.withPoster(), filteredCount,
-                loaded.hidden(), to < filteredCount, loaded.statusCounts());
+        return new UserListPage(
+                slice,
+                safePage,
+                safeSize,
+                loaded.total(),
+                loaded.ready().size(),
+                loaded.withPoster(),
+                filteredCount,
+                loaded.hidden(),
+                to < filteredCount,
+                loaded.statusCounts());
     }
 
     private LoadedViews loadViews(String username) {
         List<UserAnime> list = new ArrayList<>(userAnimeRepository.findByUserId(username));
-        list.sort(Comparator.comparing(UserAnime::getId,
-                Comparator.nullsLast(Comparator.naturalOrder())));
+        list.sort(Comparator.comparing(UserAnime::getId, Comparator.nullsLast(Comparator.naturalOrder())));
 
         Map<String, Integer> statusCounts = new LinkedHashMap<>();
         List<UserAnimeView> ready = new ArrayList<>();
@@ -168,8 +176,7 @@ public class UserListService {
                 ua.getScore(),
                 ua.getEpisodesWatched(),
                 ua.getRewatches(),
-                ua.getSource()
-        );
+                ua.getSource());
     }
 
     private static boolean hasPoster(UserAnimeView v) {
@@ -198,8 +205,8 @@ public class UserListService {
         return Character.isLetter(s.codePointAt(0));
     }
 
-    private static final List<String> STATUS_ORDER = List.of(
-            "watching", "rewatching", "planned", "completed", "on_hold", "dropped");
+    private static final List<String> STATUS_ORDER =
+            List.of("watching", "rewatching", "planned", "completed", "on_hold", "dropped");
 
     private static void sortViews(List<UserAnimeView> list, String sort) {
         String mode = sort == null ? "default" : sort;
@@ -216,18 +223,20 @@ public class UserListService {
                     return dir * collator.compare(ka, kb);
                 });
             }
-            case "score-desc" -> list.sort(Comparator.comparingInt(
-                    (UserAnimeView v) -> v.score() == null ? 0 : v.score()).reversed());
-            case "score-asc" -> list.sort(Comparator.comparingInt(
-                    (UserAnimeView v) -> v.score() == null ? 0 : v.score()));
-            case "status" -> list.sort((a, b) -> {
-                int ia = STATUS_ORDER.indexOf(a.status());
-                int ib = STATUS_ORDER.indexOf(b.status());
-                int sa = ia == -1 ? 99 : ia;
-                int sb = ib == -1 ? 99 : ib;
-                return sa != sb ? sa - sb : collator.compare(titleOf(a), titleOf(b));
-            });
-            default -> { }
+            case "score-desc" ->
+                list.sort(Comparator.comparingInt((UserAnimeView v) -> v.score() == null ? 0 : v.score())
+                        .reversed());
+            case "score-asc" ->
+                list.sort(Comparator.comparingInt((UserAnimeView v) -> v.score() == null ? 0 : v.score()));
+            case "status" ->
+                list.sort((a, b) -> {
+                    int ia = STATUS_ORDER.indexOf(a.status());
+                    int ib = STATUS_ORDER.indexOf(b.status());
+                    int sa = ia == -1 ? 99 : ia;
+                    int sb = ib == -1 ? 99 : ib;
+                    return sa != sb ? sa - sb : collator.compare(titleOf(a), titleOf(b));
+                });
+            default -> {}
         }
     }
 
@@ -245,12 +254,7 @@ public class UserListService {
     }
 
     private record LoadedViews(
-            List<UserAnimeView> ready,
-            int hidden,
-            int withPoster,
-            Map<String, Integer> statusCounts,
-            int total
-    ) {}
+            List<UserAnimeView> ready, int hidden, int withPoster, Map<String, Integer> statusCounts, int total) {}
 
     @Transactional(readOnly = true)
     public Optional<UserImport> getLastImport(String username) {
@@ -258,19 +262,25 @@ public class UserListService {
     }
 
     public record UserAnimeView(
-            Long animeId, String title, String russian, String name,
-            String kind, String airingStatus, Integer totalEpisodes, String url,
-            String posterHash, String posterExt, String posterStatus,
+            Long animeId,
+            String title,
+            String russian,
+            String name,
+            String kind,
+            String airingStatus,
+            Integer totalEpisodes,
+            String url,
+            String posterHash,
+            String posterExt,
+            String posterStatus,
             String completeness,
-            String status, Integer score, Integer episodesWatched,
-            Integer rewatches, String source
-    ) {}
+            String status,
+            Integer score,
+            Integer episodesWatched,
+            Integer rewatches,
+            String source) {}
 
-    public record UserListView(
-            List<UserAnimeView> titles,
-            int hiddenCount,
-            int totalCount
-    ) {}
+    public record UserListView(List<UserAnimeView> titles, int hiddenCount, int totalCount) {}
 
     public record UserListPage(
             List<UserAnimeView> titles,
@@ -282,6 +292,5 @@ public class UserListService {
             int filteredCount,
             int hiddenCount,
             boolean hasMore,
-            Map<String, Integer> statusCounts
-    ) {}
+            Map<String, Integer> statusCounts) {}
 }

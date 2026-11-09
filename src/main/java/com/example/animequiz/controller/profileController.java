@@ -7,11 +7,15 @@ import com.example.animequiz.service.*;
 import com.example.animequiz.service.enrichment.EnrichmentWorker;
 import com.example.animequiz.service.importer.AnimeListImporter;
 import com.example.animequiz.validation.InputValidation;
-import java.util.stream.Collectors;
-
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.*;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
@@ -29,12 +33,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.net.URLDecoder;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.util.*;
-
 @Slf4j
 @Controller
 public class profileController {
@@ -51,54 +49,52 @@ public class profileController {
     private final ActiveUserImports activeImports;
 
     @Autowired
-    public profileController(UserRepository userRepository,
-                             StorageService storageService,
-                             UserListService userListService, EnrichmentWorker enrichmentWorker,
-                             AuthService authService,
-                             List<AnimeListImporter> importersList, ActiveUserImports activeImports) {
+    public profileController(
+            UserRepository userRepository,
+            StorageService storageService,
+            UserListService userListService,
+            EnrichmentWorker enrichmentWorker,
+            AuthService authService,
+            List<AnimeListImporter> importersList,
+            ActiveUserImports activeImports) {
         this.userRepository = userRepository;
         this.storageService = storageService;
         this.userListService = userListService;
         this.enrichmentWorker = enrichmentWorker;
         this.authService = authService;
         this.importers = importersList.stream()
-                .collect(Collectors.toMap(
-                        i -> i.sourceName().toLowerCase(),
-                        i -> i));
+                .collect(Collectors.toMap(i -> i.sourceName().toLowerCase(), i -> i));
         this.activeImports = activeImports;
     }
 
     @PostMapping("/setCustomName")
     @ResponseBody
-    public ResponseEntity<Map<String, String>> setCustomUserName(@RequestParam String userName,
-                                                                 Authentication authentication,
-                                                                 HttpServletResponse response,
-                                                                 HttpServletRequest request) {
+    public ResponseEntity<Map<String, String>> setCustomUserName(
+            @RequestParam String userName,
+            Authentication authentication,
+            HttpServletResponse response,
+            HttpServletRequest request) {
         String result = executeNameUpdate(userName, authentication, response, request);
 
         if ("success".equals(result)) {
             return ResponseEntity.ok(Collections.singletonMap("message", "Имя успешно обновлено"));
         } else {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Collections.singletonMap("message", result));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("message", result));
         }
     }
 
     @GetMapping("/profile")
-    public String profile(Model model, Authentication auth,
-                          HttpServletRequest request, HttpServletResponse response) {
+    public String profile(Model model, Authentication auth, HttpServletRequest request, HttpServletResponse response) {
         String key = storageKey(auth, request, response);
         model.addAttribute("displayName", displayName(auth, request));
         model.addAttribute("authenticated", AuthService.isAuthenticated(auth));
         model.addAttribute("hasAvatar", storageService.findAvatar(key).isPresent());
         if (AuthService.isAuthenticated(auth)) {
             userRepository.findByUsername(auth.getName()).ifPresent(u -> {
-                boolean isAdmin = u.getAuthorities().stream()
-                        .anyMatch(a -> {
-                            String val = a.getAuthority();
-                            return "ADMIN".equalsIgnoreCase(val)
-                                    || "ROLE_ADMIN".equalsIgnoreCase(val);
-                        });
+                boolean isAdmin = u.getAuthorities().stream().anyMatch(a -> {
+                    String val = a.getAuthority();
+                    return "ADMIN".equalsIgnoreCase(val) || "ROLE_ADMIN".equalsIgnoreCase(val);
+                });
                 model.addAttribute("userRole", isAdmin ? "ADMIN" : "USER");
             });
         }
@@ -113,8 +109,7 @@ public class profileController {
             Authentication auth) {
 
         if (!AuthService.isAuthenticated(auth)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Требуется вход в аккаунт"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Требуется вход в аккаунт"));
         }
 
         String username = auth.getName();
@@ -127,8 +122,9 @@ public class profileController {
             enrichmentWorker.trigger();
 
             Map<String, Object> resp = new LinkedHashMap<>();
-            resp.put("message", "Импортировано: " + result.count()
-                    + " (" + importer.sourceName() + ": " + result.nickname() + ")");
+            resp.put(
+                    "message",
+                    "Импортировано: " + result.count() + " (" + importer.sourceName() + ": " + result.nickname() + ")");
             resp.put("count", result.count());
             resp.put("nickname", result.nickname());
             resp.put("source", importer.sourceName());
@@ -150,8 +146,7 @@ public class profileController {
             @RequestParam(defaultValue = "default") String sort,
             Authentication auth) {
         if (!AuthService.isAuthenticated(auth)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("titles", List.of()));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("titles", List.of()));
         }
 
         Set<String> statuses = new LinkedHashSet<>();
@@ -162,8 +157,8 @@ public class profileController {
             }
         }
 
-        UserListService.UserListPage view = userListService.getUserListPage(
-                auth.getName(), page, size, q, statuses, onlyLocal, sort);
+        UserListService.UserListPage view =
+                userListService.getUserListPage(auth.getName(), page, size, q, statuses, onlyLocal, sort);
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("titles", view.titles());
@@ -188,7 +183,8 @@ public class profileController {
     @GetMapping("/profile/import/status")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> importStatus(Authentication auth) {
-        if (!AuthService.isAuthenticated(auth)) return ResponseEntity.status(401).build();
+        if (!AuthService.isAuthenticated(auth))
+            return ResponseEntity.status(401).build();
 
         boolean running = activeImports.isRunning(auth.getName());
         UserListService.UserListView view = userListService.getUserListView(auth.getName());
@@ -203,8 +199,12 @@ public class profileController {
     }
 
     @PostMapping("/profile/name")
-    public String setName(@RequestParam String userName, Authentication auth,
-                          HttpServletResponse response, HttpServletRequest request, RedirectAttributes ra) {
+    public String setName(
+            @RequestParam String userName,
+            Authentication auth,
+            HttpServletResponse response,
+            HttpServletRequest request,
+            RedirectAttributes ra) {
         String result = executeNameUpdate(userName, auth, response, request);
 
         if ("success".equals(result)) {
@@ -215,8 +215,8 @@ public class profileController {
         return "redirect:/profile";
     }
 
-    private String executeNameUpdate(String userName, Authentication auth,
-                                     HttpServletResponse response, HttpServletRequest request) {
+    private String executeNameUpdate(
+            String userName, Authentication auth, HttpServletResponse response, HttpServletRequest request) {
         final String clean;
         try {
             clean = InputValidation.normalizeDisplayName(userName);
@@ -231,8 +231,7 @@ public class profileController {
                 user.setDisplayName(clean);
                 userRepository.save(user);
 
-                UsernamePasswordAuthenticationToken newAuth =
-                        authService.refreshAuthentication(auth, user);
+                UsernamePasswordAuthenticationToken newAuth = authService.refreshAuthentication(auth, user);
                 authService.updateSecurityContext(newAuth, request);
             }
         } else {
@@ -246,8 +245,12 @@ public class profileController {
     }
 
     @PostMapping("/profile/avatar")
-    public String setAvatar(@RequestParam("avatar") MultipartFile avatar, Authentication auth,
-                            HttpServletRequest request, HttpServletResponse response, RedirectAttributes ra) {
+    public String setAvatar(
+            @RequestParam("avatar") MultipartFile avatar,
+            Authentication auth,
+            HttpServletRequest request,
+            HttpServletResponse response,
+            RedirectAttributes ra) {
         String key = storageKey(auth, request, response);
         try {
             storageService.saveAvatar(key, avatar);
@@ -260,9 +263,11 @@ public class profileController {
 
     @GetMapping("/profile/avatar")
     @ResponseBody
-    public ResponseEntity<Resource> getAvatar(@RequestParam(value = "user", required = false) String targetUser,
-                                              Authentication auth,
-                                              HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<Resource> getAvatar(
+            @RequestParam(value = "user", required = false) String targetUser,
+            Authentication auth,
+            HttpServletRequest request,
+            HttpServletResponse response) {
         String key;
         if (targetUser != null && !targetUser.isBlank() && AuthService.isAdmin(auth)) {
             key = "u_" + targetUser;
@@ -282,14 +287,15 @@ public class profileController {
 
     @PostMapping("/profile/avatar/json")
     @ResponseBody
-    public ResponseEntity<Map<String, String>> setAvatarJson(@RequestParam("avatar") MultipartFile avatar,
-                                                             Authentication auth, HttpServletRequest request,
-                                                             HttpServletResponse response) {
+    public ResponseEntity<Map<String, String>> setAvatarJson(
+            @RequestParam("avatar") MultipartFile avatar,
+            Authentication auth,
+            HttpServletRequest request,
+            HttpServletResponse response) {
         String key = storageKey(auth, request, response);
         try {
             storageService.saveAvatar(key, avatar);
-            return ResponseEntity.ok(
-                    Collections.singletonMap("message", "Аватар обновлён"));
+            return ResponseEntity.ok(Collections.singletonMap("message", "Аватар обновлён"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Collections.singletonMap("message", e.getMessage()));
@@ -314,9 +320,11 @@ public class profileController {
 
     private String displayName(Authentication auth, HttpServletRequest request) {
         if (AuthService.isAuthenticated(auth)) {
-            return userRepository.findByUsername(auth.getName())
+            return userRepository
+                    .findByUsername(auth.getName())
                     .map(u -> (u.getDisplayName() != null && !u.getDisplayName().isBlank())
-                            ? u.getDisplayName() : u.getUsername())
+                            ? u.getDisplayName()
+                            : u.getUsername())
                     .orElse(auth.getName());
         }
         String custom = readCookie(request, NAME_COOKIE);
@@ -343,8 +351,7 @@ public class profileController {
     }
 
     private AnimeListImporter importerFor(String source) {
-        AnimeListImporter importer = importers.get(
-                source == null ? "shikimori" : source.toLowerCase());
+        AnimeListImporter importer = importers.get(source == null ? "shikimori" : source.toLowerCase());
         if (importer == null) {
             throw new InvalidInputException("Неизвестный источник: " + source);
         }

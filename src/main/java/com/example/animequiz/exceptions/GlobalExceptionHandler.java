@@ -1,5 +1,6 @@
 package com.example.animequiz.exceptions;
 
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -12,8 +13,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-
-import java.util.Map;
 
 @Slf4j
 @RestControllerAdvice
@@ -29,7 +28,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<Map<String, String>> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
+    public ResponseEntity<Map<String, String>> handleHttpMessageNotReadableException(
+            HttpMessageNotReadableException e) {
         return new ResponseEntity<>(Map.of("message", "Некорректное тело запроса"), HttpStatus.BAD_REQUEST);
     }
 
@@ -44,7 +44,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<Map<String, String>> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e) {
+    public ResponseEntity<Map<String, String>> handleHttpRequestMethodNotSupportedException(
+            HttpRequestMethodNotSupportedException e) {
         return new ResponseEntity<>(Map.of("message", "Метод не поддерживается"), HttpStatus.METHOD_NOT_ALLOWED);
     }
 
@@ -73,6 +74,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleException(Exception e) {
         log.error("Необработанная ошибка", e);
-        return new ResponseEntity<>(Map.of("message", "Что-то пошло не так. Попробуйте позже"), HttpStatus.INTERNAL_SERVER_ERROR);
+        return new ResponseEntity<>(
+                Map.of("message", "Что-то пошло не так. Попробуйте позже"), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }

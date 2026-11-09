@@ -33,5 +33,4 @@ public class GreetingController {
     public String lobby() {
         return "lobby";
     }
-
 }

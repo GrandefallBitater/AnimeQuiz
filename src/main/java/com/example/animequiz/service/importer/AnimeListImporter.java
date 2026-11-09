@@ -1,7 +1,6 @@
 package com.example.animequiz.service.importer;
 
 import com.example.animequiz.service.catalog.AnimeCatalogService;
-
 import java.util.List;
 
 public interface AnimeListImporter {
@@ -12,12 +11,7 @@ public interface AnimeListImporter {
 
     AnimeCatalogService.AnimePatch fetchFull(long sourceId);
 
-    record ImportResult(
-            long userId,
-            String nickname,
-            int count,
-            List<RatingEntry> ratings
-    ) {}
+    record ImportResult(long userId, String nickname, int count, List<RatingEntry> ratings) {}
 
     record RatingEntry(
             long sourceAnimeId,
@@ -28,6 +22,5 @@ public interface AnimeListImporter {
             String status,
             Integer score,
             Integer episodesWatched,
-            Integer rewatches
-    ) {}
+            Integer rewatches) {}
 }

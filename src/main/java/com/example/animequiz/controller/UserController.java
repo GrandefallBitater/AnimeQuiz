@@ -6,6 +6,9 @@ import com.example.animequiz.service.AuthService;
 import com.example.animequiz.service.StorageService;
 import com.example.animequiz.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
@@ -17,10 +20,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
 @Controller
 @Slf4j
 public class UserController {
@@ -30,8 +29,7 @@ public class UserController {
     private final AuthService authService;
 
     @Autowired
-    public UserController(UserService userService, StorageService storageService,
-                          AuthService authService) {
+    public UserController(UserService userService, StorageService storageService, AuthService authService) {
         this.userService = userService;
         this.storageService = storageService;
         this.authService = authService;
@@ -41,9 +39,7 @@ public class UserController {
     @GetMapping("/getUsers")
     @Secured({"ROLE_ADMIN"})
     public List<UserDto> getUsers() {
-        return userService.getUsers().stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+        return userService.getUsers().stream().map(this::toDto).collect(Collectors.toList());
     }
 
     @ResponseBody
@@ -63,10 +59,10 @@ public class UserController {
 
         String displayName = (admin != null && admin.getDisplayName() != null) ? admin.getDisplayName() : username;
         String role = "USER";
-        if (admin != null && admin.getAuthorities() != null && !admin.getAuthorities().isEmpty()) {
-            role = admin.getAuthorities().get(0)
-                    .getAuthority()
-                    .replace("ROLE_", "");
+        if (admin != null
+                && admin.getAuthorities() != null
+                && !admin.getAuthorities().isEmpty()) {
+            role = admin.getAuthorities().get(0).getAuthority().replace("ROLE_", "");
         }
 
         boolean enabled = admin != null && admin.isEnabled();
@@ -81,17 +77,14 @@ public class UserController {
                 "avatarUrl", avatarUrl,
                 "role", role.toUpperCase(),
                 "enabled", enabled,
-                "authenticated", true
-        );
+                "authenticated", true);
     }
 
     private UserDto toDto(User user) {
         String role = "user";
 
         if (user.getAuthorities() != null && !user.getAuthorities().isEmpty()) {
-            role = user.getAuthorities().get(0)
-                    .getAuthority()
-                    .replace("ROLE_", "");
+            role = user.getAuthorities().get(0).getAuthority().replace("ROLE_", "");
         }
 
         String avatarKey = "u_" + user.getUsername();
@@ -99,19 +92,13 @@ public class UserController {
 
         String avatarUrl = hasAvatar ? "/profile/avatar?user=" + user.getUsername() : "/server-images/anime-logo.png";
 
-        return new UserDto(
-                user.getUsername(),
-                user.getDisplayName(),
-                user.isEnabled(),
-                role,
-                avatarUrl
-        );
+        return new UserDto(user.getUsername(), user.getDisplayName(), user.isEnabled(), role, avatarUrl);
     }
 
     @ResponseBody
     @DeleteMapping("/deleteUser")
-    @PreAuthorize("(hasRole('ADMIN') and authentication.name != #request.username)" +
-            " or (hasRole('USER') and authentication.name == #request.username)")
+    @PreAuthorize("(hasRole('ADMIN') and authentication.name != #request.username)"
+            + " or (hasRole('USER') and authentication.name == #request.username)")
     public Map<String, String> deleteUser(@RequestBody UserRequest request) {
         userService.deleteUser(request.username);
         return Map.of("message", "Пользователь успешно удалён");
@@ -128,9 +115,8 @@ public class UserController {
     @ResponseBody
     @PostMapping("/editUser")
     @PreAuthorize("hasRole('ADMIN') or authentication.name == #userDto.username")
-    public Map<String, Object> editUser(@RequestBody UserRequest userDto,
-                                        Authentication currentAuth,
-                                        HttpServletRequest request) {
+    public Map<String, Object> editUser(
+            @RequestBody UserRequest userDto, Authentication currentAuth, HttpServletRequest request) {
         if (currentAuth == null
                 || !currentAuth.isAuthenticated()
                 || currentAuth instanceof AnonymousAuthenticationToken) {
@@ -147,37 +133,23 @@ public class UserController {
 
         if (isAdmin && !isSelfUpdate) {
             userService.updateUserByAdmin(new AdminUpdateRequest(
-                    userDto.username(),
-                    userDto.displayName(),
-                    userDto.enabled(),
-                    userDto.role()
-            ));
+                    userDto.username(), userDto.displayName(), userDto.enabled(), userDto.role()));
         } else {
-            userService.updateSelfProfile(new SelfUpdateRequest(
-                    userDto.username(),
-                    userDto.displayName()
-            ));
+            userService.updateSelfProfile(new SelfUpdateRequest(userDto.username(), userDto.displayName()));
 
             userService.getUser(userDto.username()).ifPresent(user -> {
-                UsernamePasswordAuthenticationToken newAuth =
-                        authService.refreshAuthentication(currentAuth, user);
+                UsernamePasswordAuthenticationToken newAuth = authService.refreshAuthentication(currentAuth, user);
                 authService.updateSecurityContext(newAuth, request);
             });
         }
 
-        return Map.of(
-                "message", "Пользователь обновлён",
-                "isSelfUpdate", isSelfUpdate
-        );
+        return Map.of("message", "Пользователь обновлён", "isSelfUpdate", isSelfUpdate);
     }
 
-    public record UserRequest(String username, String displayName, boolean enabled, String role, String password,
-                              String avatarUrl) {
-    }
+    public record UserRequest(
+            String username, String displayName, boolean enabled, String role, String password, String avatarUrl) {}
 
-    public record SelfUpdateRequest(String username, String displayName) {
-    }
+    public record SelfUpdateRequest(String username, String displayName) {}
 
-    public record AdminUpdateRequest(String username, String displayName, boolean enabled, String role) {
-    }
+    public record AdminUpdateRequest(String username, String displayName, boolean enabled, String role) {}
 }

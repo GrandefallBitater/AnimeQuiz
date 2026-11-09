@@ -1,0 +1,34 @@
+name: Deploy dev
+
+# The integration branch: checks first, then the local machine.
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push must not cancel a deploy that is already running: a half-finished
+# "docker compose up" is worse than waiting for the next run.
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/_checks.yml
+    with:
+      runner: '["self-hosted","Windows","X64"]'
+      branch: dev
+      commitRange: ${{ github.event.before || 'origin/dev' }}..${{ github.sha }}
+
+  deploy:
+    needs: checks
+    uses: ./.github/workflows/_deploy.yml
+    with:
+      environment: development
+      workdir: 'C:\Users\ruslan\Documents\server\AnimeQuizDeploy\AnimeQuiz'
+      healthUrl: 'http://127.0.0.1:8081/'
+      ref: dev

@@ -11,7 +11,7 @@
 
   <groupId>com.example</groupId>
   <artifactId>AnimeQuiz</artifactId>
-  <version>0.1.26-SNAPSHOT</version>
+  <version>0.1.27-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>AnimeQuiz</name>
   <description>Аниме выбор картинок</description>
@@ -36,6 +36,7 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -124,6 +125,55 @@
             </path>
           </annotationProcessorPaths>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.7.0</version>
+        <executions>
+          <execution>
+            <id>enforce-toolchain</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[17,18)</version>
+                  <message>Build with JDK 17: newer JDKs fail Lombok 1.18.30 compilation.</message>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.9,)</version>
+                </requireMavenVersion>
+                <banDuplicatePomDependencyVersions />
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>3.11.0</version>
+        <configuration>
+          <java>
+            <palantirJavaFormat>
+              <version>2.103.0</version>
+            </palantirJavaFormat>
+            <removeUnusedImports />
+            <trimTrailingWhitespace />
+            <endWithNewline />
+          </java>
+        </configuration>
+        <executions>
+          <execution>
+            <id>spotless-check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

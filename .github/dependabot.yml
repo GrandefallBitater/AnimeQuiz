@@ -1,0 +1,28 @@
+version: 2
+
+# Dependabot reads this file from the default branch, so updates start only
+# after the file is merged into main.
+updates:
+  # Maven dependencies and plugins.
+  - package-ecosystem: maven
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      maven:
+        patterns:
+          - '*'
+
+  # Actions used by the workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns:
+          - '*'

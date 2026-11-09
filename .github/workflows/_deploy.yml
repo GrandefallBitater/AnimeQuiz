@@ -1,0 +1,144 @@
+name: Deploy
+
+# Reusable deployment. It assumes a git checkout already exists on the runner,
+# with its own .env, and that the target commit has passed the checks.
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub environment name, for example development or production.
+        required: true
+        type: string
+      workdir:
+        description: Path of the deploy checkout on the runner.
+        required: true
+        type: string
+      healthUrl:
+        description: Page that shows the version in the footer.
+        required: true
+        type: string
+      ref:
+        description: Branch that is fetched before deploying.
+        required: true
+        type: string
+      runner:
+        description: Runner labels as a JSON array.
+        required: false
+        type: string
+        default: '["self-hosted","Windows","X64"]'
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ${{ fromJSON(inputs.runner) }}
+    environment:
+      name: ${{ inputs.environment }}
+    timeout-minutes: 40
+
+    steps:
+      - name: Check the deploy checkout
+        shell: pwsh
+        working-directory: ${{ inputs.workdir }}
+        run: |
+          if (-not (Test-Path '.git')) {
+              throw "No git checkout in $PWD. Clone the repository there first."
+          }
+          if (-not (Test-Path '.env')) {
+              throw "No .env in $PWD. Copy .env.example and fill it in."
+          }
+
+      # Kept for the rollback hint at the end of a failed run.
+      - name: Remember the previous commit
+        shell: pwsh
+        working-directory: ${{ inputs.workdir }}
+        run: |
+          $previous = (git rev-parse HEAD).Trim()
+          "PREVIOUS_SHA=$previous" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Previous commit: $previous"
+
+      # Deploy exactly the commit that passed the checks, not whatever happens
+      # to be on the branch when the deploy starts.
+      - name: Check out the verified commit
+        shell: pwsh
+        working-directory: ${{ inputs.workdir }}
+        run: |
+          $sha = '${{ github.sha }}'
+          git fetch --prune origin ${{ inputs.ref }}
+          if ($LASTEXITCODE -ne 0) { throw 'git fetch failed.' }
+
+          git cat-file -e "$sha^{commit}" 2>$null
+          if ($LASTEXITCODE -ne 0) {
+              git fetch origin $sha
+              if ($LASTEXITCODE -ne 0) { throw "Cannot fetch $sha." }
+          }
+
+          git reset --hard $sha
+          if ($LASTEXITCODE -ne 0) { throw 'git reset failed.' }
+
+          $head = (git rev-parse HEAD).Trim()
+          if ($head -ne $sha) { throw "HEAD is $head, expected $sha." }
+          git --no-pager log -1 --oneline
+
+      - name: Rebuild and restart the containers
+        shell: pwsh
+        working-directory: ${{ inputs.workdir }}
+        run: |
+          docker compose up -d --build --remove-orphans
+          if ($LASTEXITCODE -ne 0) { throw 'docker compose up failed.' }
+
+          $container = (docker compose ps -q app).Trim()
+          if (-not $container) { throw 'The app container was not created.' }
+          $state = (docker inspect --format '{{.State.Status}}' $container).Trim()
+          Write-Host "App container $container is $state."
+          if ($state -ne 'running') { throw "The app container is $state, not running." }
+
+      # The footer shows app.version. A 200 with the expected version proves the
+      # application is serving requests, and after a version bump it also proves
+      # that the new build is live.
+      - name: Wait for the new version
+        shell: pwsh
+        working-directory: ${{ inputs.workdir }}
+        run: |
+          $document = [xml] (Get-Content -Raw 'pom.xml')
+          $version = [string] $document.project.version
+          $url = '${{ inputs.healthUrl }}'
+          $ok = $false
+
+          for ($attempt = 1; $attempt -le 60; $attempt++) {
+              try {
+                  $response = Invoke-WebRequest -Uri $url -TimeoutSec 5
+                  if ($response.StatusCode -eq 200 -and $response.Content -match [regex]::Escape("v$version")) {
+                      Write-Host "Version $version answered on attempt $attempt."
+                      $ok = $true
+                      break
+                  }
+              } catch {
+                  # The application is probably still starting; try again below.
+              }
+              Start-Sleep -Seconds 2
+          }
+
+          if (-not $ok) {
+              docker compose ps
+              docker compose logs --tail 100 app
+              throw "Version $version did not appear at $url."
+          }
+
+      - name: Show the running services
+        if: always()
+        shell: pwsh
+        working-directory: ${{ inputs.workdir }}
+        run: docker compose ps
+
+      - name: Explain how to roll back
+        if: failure()
+        shell: pwsh
+        working-directory: ${{ inputs.workdir }}
+        run: |
+          Write-Host 'Deploy failed.'
+          if ($env:PREVIOUS_SHA) {
+              Write-Host "Previous commit: $env:PREVIOUS_SHA"
+              Write-Host 'Roll back with:'
+              Write-Host "  git reset --hard $env:PREVIOUS_SHA"
+              Write-Host '  docker compose up -d --build --remove-orphans'
+          }

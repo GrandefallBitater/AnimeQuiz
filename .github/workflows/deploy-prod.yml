@@ -1,0 +1,36 @@
+name: Deploy production
+
+# The release branch: checks always run, the deployment waits for the real
+# server. Set the repository variable PROD_DEPLOY_ENABLED to "true" when the
+# server and its deploy checkout exist; until then the deploy job is skipped.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/_checks.yml
+    with:
+      runner: '["self-hosted","Windows","X64"]'
+      branch: main
+      commitRange: ${{ github.event.before || 'origin/main' }}..${{ github.sha }}
+
+  deploy:
+    needs: checks
+    if: vars.PROD_DEPLOY_ENABLED == 'true'
+    uses: ./.github/workflows/_deploy.yml
+    with:
+      environment: production
+      # Replace this path and the URL when the production server is ready.
+      workdir: 'C:\Users\ruslan\Documents\server\AnimeQuizProd\AnimeQuiz'
+      healthUrl: 'https://animequiz.example.com/'
+      ref: main

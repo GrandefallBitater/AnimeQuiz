@@ -1,0 +1,77 @@
+name: Checks
+
+# Reusable checks. Call this workflow from another workflow instead of copying
+# the steps, so feature branches, pull requests and deployments all run exactly
+# the same gate.
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: Runner labels as a JSON array.
+        required: false
+        type: string
+        default: '["self-hosted","Windows","X64"]'
+      branch:
+        description: Branch name to validate. An empty value skips the check.
+        required: false
+        type: string
+        default: ''
+      commitRange:
+        description: Git range for the commit message check. An empty value skips it.
+        required: false
+        type: string
+        default: ''
+      versionBaseRef:
+        description: Ref to compare the pom version with. An empty value skips it.
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  checks:
+    name: checks
+    runs-on: ${{ fromJSON(inputs.runner) }}
+    timeout-minutes: 30
+
+    steps:
+      # Full history is needed for the commit range and the base branch version.
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Check the branch name
+        if: inputs.branch != ''
+        shell: pwsh
+        run: ./scripts/ci/check-branch-name.ps1 -Branch "${{ inputs.branch }}"
+
+      - name: Check the commit messages
+        if: inputs.commitRange != ''
+        shell: pwsh
+        run: ./scripts/ci/check-commit-messages.ps1 -Range "${{ inputs.commitRange }}"
+
+      - name: Check the project version
+        if: inputs.versionBaseRef != ''
+        shell: pwsh
+        run: ./scripts/ci/check-version.ps1 -BaseRef "${{ inputs.versionBaseRef }}"
+
+      # verify runs the enforcer, the tests and the Spotless format check.
+      - name: Build and verify
+        shell: pwsh
+        run: mvn -B -ntp verify
+
+      - name: Upload the test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: target/surefire-reports
+          if-no-files-found: ignore
+          retention-days: 7

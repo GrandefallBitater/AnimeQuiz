@@ -1,13 +1,16 @@
 package com.example.animequiz.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
 
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @Entity
+@ToString(onlyExplicitlyIncluded = true)
 @Table(
         name = "authorities",
         uniqueConstraints = {@UniqueConstraint(columnNames = {"username", "authority"})})
@@ -19,9 +22,9 @@ public class Authority implements org.springframework.security.core.GrantedAutho
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "username", nullable = false, updatable = false)
-    @ToString.Exclude
     private User user;
 
+    @ToString.Include
     @Column(nullable = false)
     private String authority;
 

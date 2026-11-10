@@ -1,13 +1,16 @@
 package com.example.animequiz.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @Entity
 @Table(name = "users")
@@ -16,6 +19,7 @@ public class User {
     @Id
     private String username;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 

@@ -9,6 +9,10 @@ public interface AnimeListImporter {
 
     ImportResult importList(String nickname);
 
+    default ImportResult importList(String nickname, Runnable onProgress) {
+        return importList(nickname);
+    }
+
     AnimeCatalogService.AnimePatch fetchFull(long sourceId);
 
     record ImportResult(long userId, String nickname, int count, List<RatingEntry> ratings) {}

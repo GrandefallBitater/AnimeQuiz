@@ -1,14 +1,14 @@
 package com.example.animequiz.service;
 
 import com.example.animequiz.exceptions.InvalidInputException;
+import com.google.common.util.concurrent.Striped;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.*;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.Lock;
 import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -23,10 +23,13 @@ public class StorageService {
             "image/jpeg", "jpg",
             "image/webp", "webp");
     private static final long MAX_AVATAR_BYTES = 5L * 1024 * 1024;
+
+    private static final int LOCK_STRIPES = 64;
+
     private final Path root;
     private final Path avatarsDir;
 
-    private final ConcurrentHashMap<String, ReentrantLock> locks = new ConcurrentHashMap<>();
+    private final Striped<Lock> locks = Striped.lock(LOCK_STRIPES);
 
     public StorageService(@Value("${app.storage.location}") String location) {
         this.root = Paths.get(location).toAbsolutePath().normalize();
@@ -42,8 +45,8 @@ public class StorageService {
         }
     }
 
-    private ReentrantLock lockFor(String key) {
-        return locks.computeIfAbsent(key, k -> new ReentrantLock());
+    private Lock lockFor(String key) {
+        return locks.get(key);
     }
 
     public static String sanitizeKey(String key) {
@@ -65,7 +68,7 @@ public class StorageService {
             throw new InvalidInputException("Недопустимый формат: разрешены PNG, JPEG, WEBP");
         }
         String safe = sanitizeKey(key);
-        ReentrantLock lock = lockFor("avatar:" + safe);
+        Lock lock = lockFor("avatar:" + safe);
         lock.lock();
         try {
             deleteAvatar(safe);
@@ -80,7 +83,7 @@ public class StorageService {
 
     public Optional<Path> findAvatar(String key) {
         String safe = sanitizeKey(key);
-        ReentrantLock lock = lockFor("avatar:" + safe);
+        Lock lock = lockFor("avatar:" + safe);
         lock.lock();
         try {
             if (!Files.isDirectory(avatarsDir)) return Optional.empty();

@@ -9,6 +9,7 @@ import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.ratelimit.SourceRateLimiter;
 import com.example.animequiz.support.LocalHttpServer;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,6 +65,17 @@ class MalServiceTest {
         AnimeListImporter.RatingEntry second = result.ratings().get(1);
         assertThat(second.status()).isEqualTo("watching");
         assertThat(second.rewatches()).isEqualTo(1);
+    }
+
+    @Test
+    void reportsProgressForEveryFetchedPage() {
+        http.json("/animelist/alice/load.json", """
+                [{"anime_id":100,"status":2}]""");
+
+        AtomicInteger progress = new AtomicInteger();
+        service.importList("alice", progress::incrementAndGet);
+
+        assertThat(progress.get()).isEqualTo(1);
     }
 
     @Test

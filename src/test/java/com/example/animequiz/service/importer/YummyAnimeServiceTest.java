@@ -80,6 +80,21 @@ class YummyAnimeServiceTest {
     }
 
     @Test
+    void cachesNicknameToUserIdBetweenImports() {
+        http.json("/users/alice", """
+                {"response":{"id":5}}""");
+        http.json("/users/5/lists", """
+                {"response":[{"anime_id":100}]}""");
+
+        service.importList("alice");
+        service.importList("ALICE");
+
+        assertThat(http.hits("/users/alice")).isEqualTo(1);
+        assertThat(http.hits("/users/ALICE")).isZero();
+        assertThat(http.hits("/users/5/lists")).isEqualTo(2);
+    }
+
+    @Test
     void importListRejectsBlankNickname() {
         assertThatThrownBy(() -> service.importList(" ")).isInstanceOf(InvalidInputException.class);
     }

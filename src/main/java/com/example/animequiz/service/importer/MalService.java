@@ -59,11 +59,17 @@ public class MalService implements AnimeListImporter {
 
     @Override
     public ImportResult importList(String nickname) {
+        return importList(nickname, () -> {});
+    }
+
+    @Override
+    public ImportResult importList(String nickname, Runnable onProgress) {
         String clean = nickname == null ? "" : nickname.trim();
         if (clean.isEmpty()) throw new InvalidInputException("Укажите никнейм на MyAnimeList");
 
         List<RatingEntry> entries = new ArrayList<>();
         for (int page = 0; page < MAX_PAGES; page++) {
+            onProgress.run();
             JsonNode data = fetchPage(clean, page * PAGE_SIZE);
             if (data == null || !data.isArray() || data.isEmpty()) break;
             for (JsonNode item : data) {

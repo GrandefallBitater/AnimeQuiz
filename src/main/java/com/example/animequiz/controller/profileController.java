@@ -127,7 +127,7 @@ public class profileController {
         activeImports.start(username);
         try {
             AnimeListImporter importer = importerFor(source);
-            AnimeListImporter.ImportResult result = importer.importList(nickname);
+            AnimeListImporter.ImportResult result = importer.importList(nickname, () -> activeImports.touch(username));
 
             userListService.replaceUserList(username, importer.sourceName(), result);
             enrichmentWorker.trigger();

@@ -61,6 +61,11 @@ public class ShikimoriService implements AnimeListImporter {
 
     @Override
     public ImportResult importList(String nickname) {
+        return importList(nickname, () -> {});
+    }
+
+    @Override
+    public ImportResult importList(String nickname, Runnable onProgress) {
         String clean = nickname == null ? "" : nickname.trim();
         if (clean.isEmpty()) throw new InvalidInputException("Укажите никнейм на Shikimori");
 
@@ -71,8 +76,10 @@ public class ShikimoriService implements AnimeListImporter {
         long userId = user.get("id").asLong();
         String resolvedNick = user.path("nickname").asText(clean);
 
-        ArrayNode rates = fetchAllPages(
-                page -> getJson("/users/" + userId + "/anime_rates?limit=" + PAGE_LIMIT + "&page=" + page));
+        ArrayNode rates = fetchAllPages(page -> {
+            onProgress.run();
+            return getJson("/users/" + userId + "/anime_rates?limit=" + PAGE_LIMIT + "&page=" + page);
+        });
 
         List<RatingEntry> entries = new ArrayList<>(rates.size());
         for (JsonNode rate : rates) {

@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Test;
 
 class ActiveUserImportsTest {
 
-    private final ActiveUserImports activeImports = new ActiveUserImports();
+    private long now = 1_000_000L;
+
+    private final ActiveUserImports activeImports = new ActiveUserImports(() -> now);
 
     @Test
     void tracksEachUserIndependently() {
@@ -28,5 +30,38 @@ class ActiveUserImportsTest {
         activeImports.finish("ghost");
 
         assertThat(activeImports.isRunning("ghost")).isFalse();
+    }
+
+    @Test
+    void heartbeatKeepsALongImportRunning() {
+        activeImports.start("alice");
+
+        for (int page = 0; page < 10; page++) {
+            now += ActiveUserImports.STALE_AFTER_MILLIS - 1;
+            activeImports.touch("alice");
+            activeImports.purgeStale();
+        }
+
+        assertThat(activeImports.isRunning("alice")).isTrue();
+    }
+
+    @Test
+    void importWithoutProgressIsPurged() {
+        activeImports.start("alice");
+        now += ActiveUserImports.STALE_AFTER_MILLIS + 1;
+
+        activeImports.purgeStale();
+
+        assertThat(activeImports.isRunning("alice")).isFalse();
+    }
+
+    @Test
+    void touchDoesNotResurrectFinishedImports() {
+        activeImports.start("alice");
+        activeImports.finish("alice");
+
+        activeImports.touch("alice");
+
+        assertThat(activeImports.isRunning("alice")).isFalse();
     }
 }

@@ -7,6 +7,8 @@ import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.ratelimit.SourceRateLimiter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -17,8 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -34,10 +35,16 @@ public class YummyAnimeService implements AnimeListImporter {
     private final ObjectMapper mapper = new ObjectMapper();
     private final SourceRateLimiter rateLimiter;
 
+    private static final long NICK_CACHE_SIZE = 1_000;
+    private static final long NICK_CACHE_TTL_HOURS = 12;
+
     private final String baseUrl;
     private final String appToken;
 
-    private final Map<String, Long> nickCache = new ConcurrentHashMap<>();
+    private final Cache<String, Long> nickCache = CacheBuilder.newBuilder()
+            .maximumSize(NICK_CACHE_SIZE)
+            .expireAfterWrite(Duration.ofHours(NICK_CACHE_TTL_HOURS))
+            .build();
 
     public YummyAnimeService(
             SourceRateLimiter rateLimiter,
@@ -61,7 +68,7 @@ public class YummyAnimeService implements AnimeListImporter {
         String clean = nickname == null ? "" : nickname.trim();
         if (clean.isEmpty()) throw new InvalidInputException("Укажите никнейм на YummyAnime");
 
-        long userId = nickCache.computeIfAbsent(clean.toLowerCase(), k -> resolveUserId(clean));
+        long userId = resolveUserIdCached(clean);
 
         JsonNode root = getJson("/users/" + userId + "/lists");
         JsonNode arr = root.path("response");
@@ -158,6 +165,11 @@ public class YummyAnimeService implements AnimeListImporter {
         if (url == null || url.isBlank()) return null;
         if (url.startsWith("//")) return "https:" + url;
         return url;
+    }
+
+    private long resolveUserIdCached(String nickname) {
+        String key = nickname.toLowerCase(Locale.ROOT);
+        return nickCache.asMap().computeIfAbsent(key, k -> resolveUserId(nickname));
     }
 
     private long resolveUserId(String nickname) {

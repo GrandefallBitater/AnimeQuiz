@@ -3,13 +3,18 @@ package com.example.animequiz.service;
 import com.example.animequiz.service.ratelimit.SourceRateLimiter;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import jakarta.annotation.PostConstruct;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -19,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,16 +36,21 @@ public class PosterStorageService {
     private static final long MAX_BYTES = 10L * 1024 * 1024;
     private static final Set<String> ALLOWED_MIME = Set.of("image/png", "image/jpeg", "image/gif", "image/webp");
     private static final List<String> ALL_EXT = List.of("jpg", "png", "gif", "webp");
+    private static final long INDEX_MAX_ENTRIES = 100_000;
+    private static final long INDEX_MIN_COMPACT_LINES = 1_000;
 
     private final Path postersDir;
-    private final Path urlIndexFile;
+    private final Path indexLogFile;
+    private final Path legacyIndexFile;
     private final HttpClient http;
     private final String userAgent;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    private final Map<String, String> urlToHash = new ConcurrentHashMap<>();
+    private final Cache<String, String> urlToHash =
+            CacheBuilder.newBuilder().maximumSize(INDEX_MAX_ENTRIES).build();
     private final ReentrantLock indexWriteLock = new ReentrantLock();
     private final SourceRateLimiter rateLimiter;
+    private long indexLinesOnDisk;
 
     public PosterStorageService(
             @Value("${app.storage.location}") String location,
@@ -49,7 +58,8 @@ public class PosterStorageService {
             SourceRateLimiter rateLimiter) {
         this.postersDir = Paths.get(location).toAbsolutePath().normalize().resolve("posters");
         this.rateLimiter = rateLimiter;
-        this.urlIndexFile = this.postersDir.resolve("_url_index.json");
+        this.indexLogFile = this.postersDir.resolve("_url_index.log");
+        this.legacyIndexFile = this.postersDir.resolve("_url_index.json");
         this.userAgent = userAgent;
         this.http = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
@@ -60,15 +70,15 @@ public class PosterStorageService {
     @PostConstruct
     void init() throws IOException {
         Files.createDirectories(postersDir);
-        if (Files.isRegularFile(urlIndexFile)) {
-            try {
-                Map<String, String> loaded =
-                        mapper.readValue(urlIndexFile.toFile(), new TypeReference<HashMap<String, String>>() {});
-                urlToHash.putAll(loaded);
-                log.info("Загружен URL-индекс постеров: {} записей", loaded.size());
-            } catch (IOException e) {
-                log.warn("Не удалось прочитать URL-индекс постеров, стартуем с пустым", e);
-            }
+        boolean migrated = false;
+        if (Files.isRegularFile(indexLogFile)) {
+            indexLinesOnDisk = readLog(indexLogFile);
+        } else if (Files.isRegularFile(legacyIndexFile)) {
+            readLegacyIndex();
+            migrated = true;
+        }
+        if (migrated || indexLinesOnDisk > compactionThreshold()) {
+            compact();
         }
     }
 
@@ -77,7 +87,7 @@ public class PosterStorageService {
     public Optional<StoredPoster> findByUrl(String url) {
         if (url == null || url.isBlank()) return Optional.empty();
 
-        String hash = urlToHash.get(url);
+        String hash = urlToHash.getIfPresent(url);
         if (hash == null) return Optional.empty();
 
         for (String ext : ALL_EXT) {
@@ -91,7 +101,7 @@ public class PosterStorageService {
                 }
             }
         }
-        urlToHash.remove(url, hash);
+        urlToHash.invalidate(url);
         return Optional.empty();
     }
 
@@ -185,23 +195,104 @@ public class PosterStorageService {
     }
 
     private void registerUrl(String url, String hash) {
-        String previous = urlToHash.put(url, hash);
+        String previous = urlToHash.asMap().put(url, hash);
         if (hash.equals(previous)) return;
 
         indexWriteLock.lock();
         try {
-            Path tmp = Files.createTempFile(postersDir, "_url_index.", ".tmp");
-            mapper.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), urlToHash);
-            try {
-                Files.move(tmp, urlIndexFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException e) {
-                Files.move(tmp, urlIndexFile, StandardCopyOption.REPLACE_EXISTING);
+            Files.writeString(
+                    indexLogFile,
+                    hash + " " + url + '\n',
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND);
+            indexLinesOnDisk++;
+            if (indexLinesOnDisk > compactionThreshold()) {
+                compactIndex();
             }
         } catch (IOException e) {
             log.warn("Не удалось сохранить URL-индекс постеров", e);
         } finally {
             indexWriteLock.unlock();
         }
+    }
+
+    private long compactionThreshold() {
+        return Math.max(INDEX_MIN_COMPACT_LINES, 2L * urlToHash.size());
+    }
+
+    void compact() {
+        indexWriteLock.lock();
+        try {
+            compactIndex();
+        } catch (IOException e) {
+            log.warn("Не удалось сжать URL-индекс постеров", e);
+        } finally {
+            indexWriteLock.unlock();
+        }
+    }
+
+    private void compactIndex() throws IOException {
+        Path tmp = Files.createTempFile(postersDir, "_url_index.", ".tmp");
+        long written = 0;
+        try (BufferedWriter out = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
+            for (Map.Entry<String, String> entry : urlToHash.asMap().entrySet()) {
+                out.write(entry.getValue());
+                out.write(' ');
+                out.write(entry.getKey());
+                out.write('\n');
+                written++;
+            }
+        }
+        try {
+            Files.move(tmp, indexLogFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(tmp, indexLogFile, StandardCopyOption.REPLACE_EXISTING);
+        }
+        indexLinesOnDisk = written;
+    }
+
+    private long readLog(Path file) {
+        long lines = 0;
+        try (BufferedReader in = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            String line;
+            while ((line = in.readLine()) != null) {
+                lines++;
+                if (line.length() < 65 || line.charAt(64) != ' ') continue;
+                String hash = line.substring(0, 64);
+                String url = line.substring(65);
+                if (isSha256(hash) && !url.isBlank()) {
+                    urlToHash.put(url, hash);
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Не удалось прочитать URL-индекс постеров, стартуем с пустым", e);
+        }
+        log.info("Загружен URL-индекс постеров: {} записей из {} строк", urlToHash.size(), lines);
+        return lines;
+    }
+
+    private void readLegacyIndex() {
+        try {
+            Map<String, String> loaded =
+                    mapper.readValue(legacyIndexFile.toFile(), new TypeReference<HashMap<String, String>>() {});
+            loaded.forEach((url, hash) -> {
+                if (hash != null && isSha256(hash)) urlToHash.put(url, hash);
+            });
+            log.info("Старый URL-индекс постеров перенесён в журнал: {} записей", loaded.size());
+        } catch (IOException e) {
+            log.warn("Не удалось прочитать старый URL-индекс постеров", e);
+        }
+    }
+
+    private static boolean isSha256(String value) {
+        if (value.length() != 64) return false;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            boolean hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+            if (!hex) return false;
+        }
+        return true;
     }
 
     public Path resolve(String hash, String ext) {

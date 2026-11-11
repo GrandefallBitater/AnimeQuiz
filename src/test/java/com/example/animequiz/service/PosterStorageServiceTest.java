@@ -51,7 +51,7 @@ class PosterStorageServiceTest {
         assertThat(stored.path()).startsWith("posters/");
         assertThat(Files.isRegularFile(posterStorage.resolve(stored.hash(), stored.ext())))
                 .isTrue();
-        assertThat(Files.isRegularFile(tempDir.resolve("posters").resolve("_url_index.json")))
+        assertThat(Files.isRegularFile(tempDir.resolve("posters").resolve("_url_index.log")))
                 .isTrue();
 
         PosterStorageService.StoredPoster cached = posterStorage.downloadAndStore(url);
@@ -59,6 +59,52 @@ class PosterStorageServiceTest {
         assertThat(cached.hash()).isEqualTo(stored.hash());
         assertThat(http.hits("/poster.png")).isEqualTo(1);
         assertThat(posterStorage.findByUrl(url)).isPresent();
+    }
+
+    @Test
+    void reloadsIndexFromDiskAfterRestart() throws IOException {
+        http.bytes("/poster.png", "image/png", PNG);
+        String url = http.baseUrl() + "/poster.png";
+        PosterStorageService.StoredPoster stored = posterStorage.downloadAndStore(url);
+
+        PosterStorageService restarted = new PosterStorageService(tempDir.toString(), "test-agent", noRateLimit());
+        restarted.init();
+
+        assertThat(restarted.findByUrl(url).orElseThrow().hash()).isEqualTo(stored.hash());
+        assertThat(http.hits("/poster.png")).isEqualTo(1);
+    }
+
+    @Test
+    void migratesLegacyJsonIndexIntoTheLog() throws IOException {
+        String hash = "a".repeat(64);
+        String url = "https://example.test/legacy.png";
+        Path posters = tempDir.resolve("posters");
+        Path posterFile = posters.resolve("aa").resolve("aa").resolve(hash + ".png");
+        Files.createDirectories(posterFile.getParent());
+        Files.write(posterFile, PNG);
+        Files.writeString(posters.resolve("_url_index.json"), "{\"" + url + "\":\"" + hash + "\"}");
+
+        PosterStorageService migrated = new PosterStorageService(tempDir.toString(), "test-agent", noRateLimit());
+        migrated.init();
+
+        assertThat(migrated.findByUrl(url).orElseThrow().hash()).isEqualTo(hash);
+        assertThat(Files.readAllLines(posters.resolve("_url_index.log"))).hasSize(1);
+    }
+
+    @Test
+    void compactionDropsEntriesWhoseFilesAreGone() throws IOException {
+        http.bytes("/a.png", "image/png", PNG);
+        http.bytes("/b.png", "image/png", new byte[] {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 9, 9, 9});
+        PosterStorageService.StoredPoster a = posterStorage.downloadAndStore(http.baseUrl() + "/a.png");
+        posterStorage.downloadAndStore(http.baseUrl() + "/b.png");
+
+        Files.delete(posterStorage.resolve(a.hash(), a.ext()));
+        assertThat(posterStorage.findByUrl(http.baseUrl() + "/a.png")).isEmpty();
+
+        posterStorage.compact();
+
+        assertThat(Files.readAllLines(tempDir.resolve("posters").resolve("_url_index.log")))
+                .hasSize(1);
     }
 
     @Test

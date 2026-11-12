@@ -9,3 +9,6 @@
 
 # Weekly paired backup on Sunday at 03:30.
 30 3 * * 0 /scripts/backup.sh all
+
+# Monthly restore check on the first day at 04:00.
+0 4 1 * * /scripts/backup.sh restore-db --target AnimeQuiz_restore

@@ -67,6 +67,18 @@ jobs:
         shell: pwsh
         run: mvn -B -ntp verify
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Upload the test reports
         if: failure()
         uses: actions/upload-artifact@v4

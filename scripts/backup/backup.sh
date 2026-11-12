@@ -301,8 +301,9 @@ restore_storage() {
 
     [ -d "$STORAGE_ROOT" ] || fail "Storage directory not found: $STORAGE_ROOT"
 
-    local old
+    local old app_owner
     old="$STORAGE_ROOT/.restore-$(date +%Y%m%d-%H%M%S)"
+    app_owner="$(stat -c '%u:%g' "$STORAGE_ROOT/posters" 2>/dev/null || true)"
     mkdir -p "$old"
 
     local moved=()
@@ -343,6 +344,13 @@ restore_storage() {
     log INFO "Extracted files: $(find "$STORAGE_ROOT" \
         \( -path "$STORAGE_ROOT/logs" -o -path "$STORAGE_ROOT/.restore-*" \) -prune \
         -o -type f -print | wc -l)"
+
+    if [ -n "$app_owner" ]; then
+        chown -R "$app_owner" "$STORAGE_ROOT"
+        log INFO "Storage ownership set to $app_owner."
+    else
+        log WARN "Owner of $STORAGE_ROOT/posters is unknown. Ownership left unchanged."
+    fi
 
     if [ "$remove_old" -eq 1 ]; then
         rm -rf "$old"

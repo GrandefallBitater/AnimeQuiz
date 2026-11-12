@@ -20,6 +20,11 @@ services:
       timeout: 3s
       retries: 20
     shm_size: 128mb
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   app:
     build:
@@ -42,6 +47,11 @@ services:
       - animequiz_storage:/app/storage
     ports:
       - "8081:8081"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # On-demand backup and restore tool. Not started by "docker compose up".
   # Run it with: docker compose --profile tools run --rm backup <command>

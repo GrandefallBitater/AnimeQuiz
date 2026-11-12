@@ -79,11 +79,18 @@ jobs:
           if ($head -ne $sha) { throw "HEAD is $head, expected $sha." }
           git --no-pager log -1 --oneline
 
+      - name: Dump the database before migrating
+        shell: pwsh
+        working-directory: ${{ inputs.workdir }}
+        run: |
+          docker compose --profile tools run --rm backup db
+          if ($LASTEXITCODE -ne 0) { throw 'The pre-deploy database dump failed.' }
+
       - name: Rebuild and restart the containers
         shell: pwsh
         working-directory: ${{ inputs.workdir }}
         run: |
-          docker compose up -d --build --remove-orphans
+          docker compose up -d --build --pull always --remove-orphans
           if ($LASTEXITCODE -ne 0) { throw 'docker compose up failed.' }
 
           $container = (docker compose ps -q app).Trim()

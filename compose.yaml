@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       # PostgreSQL 18+ stores data under /var/lib/postgresql/<major>/docker,
       # so the volume must be mounted at /var/lib/postgresql.

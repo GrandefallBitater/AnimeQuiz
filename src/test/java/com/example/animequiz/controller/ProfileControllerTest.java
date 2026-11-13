@@ -2,17 +2,22 @@ package com.example.animequiz.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.animequiz.entity.ImportJob;
 import com.example.animequiz.exceptions.GlobalExceptionHandler;
+import com.example.animequiz.exceptions.InvalidInputException;
 import com.example.animequiz.repository.UserRepository;
 import com.example.animequiz.service.ActiveUserImports;
 import com.example.animequiz.service.AuthService;
@@ -20,6 +25,7 @@ import com.example.animequiz.service.ImportJobService;
 import com.example.animequiz.service.StorageService;
 import com.example.animequiz.service.UserListService;
 import com.example.animequiz.service.importer.AnimeListImporter;
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -171,5 +178,38 @@ class ProfileControllerTest {
     @Test
     void statusRequiresLogin() throws Exception {
         mvc.perform(get("/profile/import/status")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void setAvatarJsonRejectsAnInvalidFormat() throws Exception {
+        doThrow(new InvalidInputException("Недопустимый формат: разрешены PNG, JPEG, GIF, WEBP"))
+                .when(storageService)
+                .saveAvatar(eq("u_alice"), any());
+        MockMultipartFile file = new MockMultipartFile("avatar", "a.txt", "text/plain", new byte[] {1});
+
+        mvc.perform(multipart("/profile/avatar/json").file(file).principal(auth))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Недопустимый формат: разрешены PNG, JPEG, GIF, WEBP"));
+    }
+
+    @Test
+    void setAvatarJsonReportsStorageFailureAsServerError() throws Exception {
+        doThrow(new IOException("disk full")).when(storageService).saveAvatar(eq("u_alice"), any());
+        MockMultipartFile file = new MockMultipartFile("avatar", "a.png", "image/png", new byte[] {(byte) 0x89});
+
+        mvc.perform(multipart("/profile/avatar/json").file(file).principal(auth))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("Не удалось сохранить аватар, попробуйте позже"));
+    }
+
+    @Test
+    void setAvatarRedirectsWithFriendlyErrorOnStorageFailure() throws Exception {
+        doThrow(new IOException("disk full")).when(storageService).saveAvatar(eq("u_alice"), any());
+        MockMultipartFile file = new MockMultipartFile("avatar", "a.png", "image/png", new byte[] {(byte) 0x89});
+
+        mvc.perform(multipart("/profile/avatar").file(file).principal(auth))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/profile"))
+                .andExpect(flash().attribute("error", "Не удалось сохранить аватар, попробуйте позже"));
     }
 }

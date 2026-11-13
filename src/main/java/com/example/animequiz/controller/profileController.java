@@ -14,6 +14,7 @@ import com.example.animequiz.validation.InputValidation;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -287,6 +288,9 @@ public class profileController {
             ra.addFlashAttribute("message", "Аватар обновлён");
         } catch (IllegalArgumentException e) {
             ra.addFlashAttribute("error", e.getMessage());
+        } catch (IOException e) {
+            log.error("Не удалось сохранить аватар: {}", InputValidation.forLog(key), e);
+            ra.addFlashAttribute("error", "Не удалось сохранить аватар, попробуйте позже");
         }
         return "redirect:/profile";
     }
@@ -329,6 +333,10 @@ public class profileController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Collections.singletonMap("message", e.getMessage()));
+        } catch (IOException e) {
+            log.error("Не удалось сохранить аватар: {}", InputValidation.forLog(key), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.singletonMap("message", "Не удалось сохранить аватар, попробуйте позже"));
         }
     }
 

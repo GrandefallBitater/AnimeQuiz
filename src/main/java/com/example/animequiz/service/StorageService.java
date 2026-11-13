@@ -6,7 +6,6 @@ import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.*;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Stream;
@@ -18,10 +17,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class StorageService {
 
-    private static final Map<String, String> ALLOWED_IMAGE_TYPES = Map.of(
-            "image/png", "png",
-            "image/jpeg", "jpg",
-            "image/webp", "webp");
     private static final long MAX_AVATAR_BYTES = 5L * 1024 * 1024;
 
     private static final int LOCK_STRIPES = 64;
@@ -56,17 +51,22 @@ public class StorageService {
         return cleaned;
     }
 
-    public void saveAvatar(String key, MultipartFile file) {
+    public void saveAvatar(String key, MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new InvalidInputException("Файл не выбран");
         }
         if (file.getSize() > MAX_AVATAR_BYTES) {
             throw new InvalidInputException("Файл слишком большой (макс. 5 МБ)");
         }
-        String ext = ALLOWED_IMAGE_TYPES.get(file.getContentType());
-        if (ext == null) {
-            throw new InvalidInputException("Недопустимый формат: разрешены PNG, JPEG, WEBP");
+        byte[] bytes = file.getBytes();
+        String mime = MimeTypes.detectMime(bytes);
+
+        if (!MimeTypes.isAllowedMime(mime)) {
+            throw new InvalidInputException("Недопустимый формат: разрешены PNG, JPEG, GIF, WEBP");
         }
+
+        String ext = MimeTypes.extFor(mime);
+
         String safe = sanitizeKey(key);
         Lock lock = lockFor("avatar:" + safe);
         lock.lock();
@@ -74,8 +74,6 @@ public class StorageService {
             deleteAvatar(safe);
             Path target = avatarsDir.resolve(safe + "." + ext);
             file.transferTo(target);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Не удалось сохранить изображение", e);
         } finally {
             lock.unlock();
         }

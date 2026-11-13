@@ -134,8 +134,8 @@ src/main/java/com/example/animequiz/
 | POST | `/auth/register` | все | `{username, password}` | `{message}` |
 | POST | `/setCustomName` | все | `userName` | `{message}` или 400 |
 | POST | `/profile/name` | все | `userName` | редирект на `/profile` |
-| POST | `/profile/avatar` | все | multipart `avatar` | редирект на `/profile` |
-| POST | `/profile/avatar/json` | все | multipart `avatar` | `{message}` или 400 |
+| POST | `/profile/avatar` | все | multipart `avatar` | редирект на `/profile`; flash `error` при плохом файле или сбое записи |
+| POST | `/profile/avatar/json` | все | multipart `avatar` | `{message}`; 400 при плохом файле, 500 при сбое записи |
 | GET | `/profile/avatar?user=` | все; чужой аватар — только админ | — | файл или 404 |
 | POST | `/profile/import/json` | проверка в методе | `nickname`, `source` | `202 {message, jobId, source, nickname}`, `409` при занятом импорте |
 | GET | `/profile/import/status` | проверка в методе | — | см. ниже |
@@ -398,11 +398,28 @@ sequenceDiagram
 
 - `sanitizeKey` оставляет только `[A-Za-z0-9_-]`, поэтому имя файла не может
   выйти за пределы каталога.
-- `saveAvatar` проверяет размер (5 МБ) и MIME (png/jpeg/webp), удаляет старый
-  файл и пишет новый под блокировкой из `Striped.lock(64)` — одна полоса на
-  ключ, чтобы параллельные загрузки не оставили два файла.
+- `saveAvatar` проверяет размер (5 МБ) и формат по сигнатуре файла
+  (png/jpeg/gif/webp), удаляет старый файл и пишет новый под блокировкой из
+  `Striped.lock(64)` — одна полоса на ключ, чтобы параллельные загрузки не
+  оставили два файла. Заявленный клиентом `Content-Type` не используется, а
+  расширение берётся из определённого типа: GIF, переименованный в `.png`,
+  сохранится как `.gif`.
+- Ошибки ввода-вывода не заворачиваются: чтение multipart и запись файла
+  пробрасываются как `IOException`. Контроллер логирует их, пишет в лог
+  исходную причину, а пользователю отдаёт общее сообщение (flash в HTML-форме,
+  500 в JSON-ручке).
 - `findAvatar` ищет файл по префиксу `<key>.`, `deleteAvatar` удаляет все
   совпадения.
+
+### `MimeTypes`
+Утилита без состояния, общая для постеров и аватаров:
+
+- `detectMime(bytes)` — сигнатуры PNG, JPEG, GIF, WebP; всё остальное —
+  `application/octet-stream`.
+- `isAllowedMime`, `extFor`, `mimeForExt` — белый список и обратное
+  сопоставление MIME ↔ расширение (белый список: png, jpeg, gif, webp).
+- `sha256Hex` — хеш для имени файла постера, `isSha256` — проверка строки
+  индекса `_url_index.log`.
 
 ## 10. Импортёры внешних источников
 
@@ -495,7 +512,7 @@ user_anime, user_import, import_job, индексы, `pg_trgm`).
   POST/DELETE.
 - Методы — `@PreAuthorize` в `UserController` и `adminController`.
 - Импорт и профиль — явные проверки `AuthService` внутри контроллера.
-- Файлы — `sanitizeKey`, проверка MIME и размера, лимит multipart 5 МБ.
+- Файлы — `sanitizeKey`, проверка формата по сигнатуре и размера, лимит multipart 5 МБ.
 - Логи — пользовательские строки только через `InputValidation.forLog`.
 
 ## 13. Фронтенд

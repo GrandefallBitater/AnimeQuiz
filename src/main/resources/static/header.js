@@ -110,7 +110,7 @@ $(document).ready(function () {
             <div class="form-group">
                 <label for="favatar">Файл изображения</label>
                 <input type="file" id="favatar" name="avatar" accept="image/*">
-                <span class="form-hint">PNG, JPG или WEBP. Не больше 5 МБ.</span>
+                <span class="form-hint">PNG, JPG, GIF или WEBP. Не больше 5 МБ.</span>
             </div>
 
             <div class="form-group" style="text-align:center;">

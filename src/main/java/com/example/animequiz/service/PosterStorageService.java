@@ -1,5 +1,6 @@
 package com.example.animequiz.service;
 
+import com.example.animequiz.exceptions.InvalidInputException;
 import com.example.animequiz.service.ratelimit.SourceRateLimiter;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,14 +17,11 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,7 +32,6 @@ import org.springframework.stereotype.Service;
 public class PosterStorageService {
 
     private static final long MAX_BYTES = 10L * 1024 * 1024;
-    private static final Set<String> ALLOWED_MIME = Set.of("image/png", "image/jpeg", "image/gif", "image/webp");
     private static final List<String> ALL_EXT = List.of("jpg", "png", "gif", "webp");
     private static final long INDEX_MAX_ENTRIES = 100_000;
     private static final long INDEX_MIN_COMPACT_LINES = 1_000;
@@ -96,7 +93,8 @@ public class PosterStorageService {
                 try {
                     String localPath =
                             "posters/" + postersDir.relativize(p).toString().replace('\\', '/');
-                    return Optional.of(new StoredPoster(hash, localPath, mimeForExt(ext), Files.size(p), ext));
+                    return Optional.of(
+                            new StoredPoster(hash, localPath, MimeTypes.mimeForExt(ext), Files.size(p), ext));
                 } catch (IOException ignored) {
                 }
             }
@@ -146,17 +144,17 @@ public class PosterStorageService {
 
             byte[] bytes = resp.body();
             if (bytes.length == 0 || bytes.length > MAX_BYTES) {
-                throw new IllegalArgumentException("Некорректный размер постера");
+                throw new InvalidInputException("Некорректный размер постера");
             }
 
-            String mime =
-                    detectMime(bytes, resp.headers().firstValue("Content-Type").orElse(null));
-            if (!ALLOWED_MIME.contains(mime)) {
-                throw new IllegalArgumentException("Недопустимый MIME: " + mime);
+            String mime = MimeTypes.detectMime(bytes);
+
+            if (!MimeTypes.isAllowedMime(mime)) {
+                throw new InvalidInputException("Недопустимый MIME: " + mime);
             }
 
-            String hash = sha256Hex(bytes);
-            String ext = extFor(mime);
+            String hash = MimeTypes.sha256Hex(bytes);
+            String ext = MimeTypes.extFor(mime);
 
             String p1 = hash.substring(0, 2);
             String p2 = hash.substring(2, 4);
@@ -261,7 +259,7 @@ public class PosterStorageService {
                 if (line.length() < 65 || line.charAt(64) != ' ') continue;
                 String hash = line.substring(0, 64);
                 String url = line.substring(65);
-                if (isSha256(hash) && !url.isBlank()) {
+                if (MimeTypes.isSha256(hash) && !url.isBlank()) {
                     urlToHash.put(url, hash);
                 }
             }
@@ -277,22 +275,12 @@ public class PosterStorageService {
             Map<String, String> loaded =
                     mapper.readValue(legacyIndexFile.toFile(), new TypeReference<HashMap<String, String>>() {});
             loaded.forEach((url, hash) -> {
-                if (hash != null && isSha256(hash)) urlToHash.put(url, hash);
+                if (hash != null && MimeTypes.isSha256(hash)) urlToHash.put(url, hash);
             });
             log.info("Старый URL-индекс постеров перенесён в журнал: {} записей", loaded.size());
         } catch (IOException e) {
             log.warn("Не удалось прочитать старый URL-индекс постеров", e);
         }
-    }
-
-    private static boolean isSha256(String value) {
-        if (value.length() != 64) return false;
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            boolean hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
-            if (!hex) return false;
-        }
-        return true;
     }
 
     public Path resolve(String hash, String ext) {
@@ -309,64 +297,5 @@ public class PosterStorageService {
             throw new IllegalStateException("Path traversal");
         }
         return p;
-    }
-
-    private static String mimeForExt(String ext) {
-        return switch (ext) {
-            case "png" -> "image/png";
-            case "gif" -> "image/gif";
-            case "webp" -> "image/webp";
-            default -> "image/jpeg";
-        };
-    }
-
-    private static String sha256Hex(byte[] data) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] d = md.digest(data);
-            StringBuilder sb = new StringBuilder(d.length * 2);
-            for (byte b : d) sb.append(String.format("%02x", b));
-            return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    private static String extFor(String mime) {
-        return switch (mime) {
-            case "image/png" -> "png";
-            case "image/gif" -> "gif";
-            case "image/webp" -> "webp";
-            default -> "jpg";
-        };
-    }
-
-    private static String detectMime(byte[] b, String header) {
-        if (b.length >= 8 && (b[0] & 0xFF) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') {
-            return "image/png";
-        }
-        if (b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8) {
-            return "image/jpeg";
-        }
-        if (b.length >= 6 && b[0] == 'G' && b[1] == 'I' && b[2] == 'F') {
-            return "image/gif";
-        }
-        if (b.length >= 12
-                && b[0] == 'R'
-                && b[1] == 'I'
-                && b[2] == 'F'
-                && b[3] == 'F'
-                && b[8] == 'W'
-                && b[9] == 'E'
-                && b[10] == 'B'
-                && b[11] == 'P') {
-            return "image/webp";
-        }
-        if (header != null) {
-            int semi = header.indexOf(';');
-            String ct = (semi > 0 ? header.substring(0, semi) : header).trim().toLowerCase();
-            if (ALLOWED_MIME.contains(ct)) return ct;
-        }
-        return "application/octet-stream";
     }
 }

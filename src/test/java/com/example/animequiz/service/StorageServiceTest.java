@@ -16,6 +16,10 @@ import org.springframework.mock.web.MockMultipartFile;
 
 class StorageServiceTest {
 
+    private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3};
+    private static final byte[] JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 1, 2, 3};
+    private static final byte[] GIF = {'G', 'I', 'F', '8', '9', 'a', 1, 2, 3};
+
     @TempDir
     private Path tempDir;
 
@@ -48,28 +52,27 @@ class StorageServiceTest {
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("5 МБ");
 
-        MockMultipartFile gif = new MockMultipartFile("avatar", "a.gif", "image/gif", new byte[] {1, 2, 3});
-        assertThatThrownBy(() -> storageService.saveAvatar("u_alice", gif))
+        MockMultipartFile text = new MockMultipartFile("avatar", "a.txt", "text/plain", new byte[] {1, 2, 3});
+        assertThatThrownBy(() -> storageService.saveAvatar("u_alice", text))
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("PNG");
     }
 
     @Test
     void saveAvatarStoresFileAndFindAvatarReturnsIt() throws IOException {
-        byte[] content = {1, 2, 3, 4};
-        MockMultipartFile file = new MockMultipartFile("avatar", "avatar.png", "image/png", content);
+        MockMultipartFile file = new MockMultipartFile("avatar", "avatar.png", "image/png", PNG);
 
         storageService.saveAvatar("u_alice", file);
 
         Path stored = storageService.findAvatar("u_alice").orElseThrow();
         assertThat(stored.getFileName().toString()).isEqualTo("u_alice.png");
-        assertThat(Files.readAllBytes(stored)).isEqualTo(content);
+        assertThat(Files.readAllBytes(stored)).isEqualTo(PNG);
     }
 
     @Test
     void saveAvatarReplacesPreviousFileWithAnotherExtension() throws IOException {
-        storageService.saveAvatar("u_alice", new MockMultipartFile("avatar", "a.png", "image/png", new byte[] {1}));
-        storageService.saveAvatar("u_alice", new MockMultipartFile("avatar", "a.jpg", "image/jpeg", new byte[] {2}));
+        storageService.saveAvatar("u_alice", new MockMultipartFile("avatar", "a.png", "image/png", PNG));
+        storageService.saveAvatar("u_alice", new MockMultipartFile("avatar", "a.jpg", "image/jpeg", JPEG));
 
         assertThat(storageService
                         .findAvatar("u_alice")
@@ -83,8 +86,19 @@ class StorageServiceTest {
     }
 
     @Test
+    void saveAvatarAcceptsGifAndUsesDetectedExtension() throws IOException {
+        MockMultipartFile file = new MockMultipartFile("avatar", "a.png", "image/png", GIF);
+
+        storageService.saveAvatar("u_alice", file);
+
+        Path stored = storageService.findAvatar("u_alice").orElseThrow();
+        assertThat(stored.getFileName().toString()).isEqualTo("u_alice.gif");
+        assertThat(Files.readAllBytes(stored)).isEqualTo(GIF);
+    }
+
+    @Test
     void deleteAvatarRemovesAllFilesWithTheSameKey() throws IOException {
-        storageService.saveAvatar("u_alice", new MockMultipartFile("avatar", "a.png", "image/png", new byte[] {1}));
+        storageService.saveAvatar("u_alice", new MockMultipartFile("avatar", "a.png", "image/png", PNG));
 
         storageService.deleteAvatar("u_alice");
 

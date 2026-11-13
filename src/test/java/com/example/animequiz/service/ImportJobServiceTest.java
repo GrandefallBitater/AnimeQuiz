@@ -81,6 +81,25 @@ class ImportJobServiceTest {
     }
 
     @Test
+    void startSiteImportRejectsASecondRunWhileTheFirstIsStillRunning() {
+        ImportJobService asyncSelf = mock(ImportJobService.class);
+        when(jobRepo.findFirstByTypeAndStateOrderByIdDesc("site_import", "running"))
+                .thenReturn(Optional.empty());
+        when(jobRepo.save(any(ImportJob.class))).thenAnswer(invocation -> {
+            ImportJob job = invocation.getArgument(0);
+            job.setId(7L);
+            return job;
+        });
+        when(self.getObject()).thenReturn(asyncSelf);
+
+        service.startSiteImport();
+
+        assertThatThrownBy(() -> service.startSiteImport())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Импорт уже выполняется");
+    }
+
+    @Test
     void currentRunningAndLastJobReadTheRepository() {
         ImportJob running = new ImportJob();
         when(jobRepo.findFirstByTypeAndStateOrderByIdDesc("site_import", "running"))

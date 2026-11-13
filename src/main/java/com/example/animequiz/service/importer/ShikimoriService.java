@@ -61,11 +61,11 @@ public class ShikimoriService implements AnimeListImporter {
 
     @Override
     public ImportResult importList(String nickname) {
-        return importList(nickname, () -> {});
+        return importList(nickname, loaded -> {});
     }
 
     @Override
-    public ImportResult importList(String nickname, Runnable onProgress) {
+    public ImportResult importList(String nickname, ProgressListener onProgress) {
         String clean = nickname == null ? "" : nickname.trim();
         if (clean.isEmpty()) throw new InvalidInputException("Укажите никнейм на Shikimori");
 
@@ -77,7 +77,7 @@ public class ShikimoriService implements AnimeListImporter {
         String resolvedNick = user.path("nickname").asText(clean);
 
         ArrayNode rates = fetchAllPages(page -> {
-            onProgress.run();
+            onProgress.loaded((page - 1) * PAGE_LIMIT);
             return getJson("/users/" + userId + "/anime_rates?limit=" + PAGE_LIMIT + "&page=" + page);
         });
 

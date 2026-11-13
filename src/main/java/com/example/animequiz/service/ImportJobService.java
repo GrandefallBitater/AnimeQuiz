@@ -4,6 +4,7 @@ import com.example.animequiz.entity.ImportJob;
 import com.example.animequiz.repository.ImportJobRepository;
 import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.enrichment.EnrichmentWorker;
+import com.example.animequiz.service.importer.AnimeListImporter;
 import com.example.animequiz.service.importer.ShikimoriService;
 import com.example.animequiz.service.importer.YummyAnimeService;
 import jakarta.annotation.PostConstruct;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -31,8 +33,10 @@ public class ImportJobService {
     private final AnimeCatalogService catalog;
     private final EnrichmentWorker enrichmentWorker;
     private final ObjectProvider<ImportJobService> self;
+    private final ActiveUserImports activeImports;
     // Held while an import is running, so two concurrent requests cannot start the same job.
     private final AtomicBoolean importRunning = new AtomicBoolean(false);
+    private final UserListService userListService;
 
     @PostConstruct
     public void init() {
@@ -51,6 +55,83 @@ public class ImportJobService {
     public Optional<ImportJob> lastJob(String type) {
         List<ImportJob> list = jobRepo.findTop10ByTypeOrderByIdDesc(type);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    public Long startUserImport(String username, AnimeListImporter importer, String nickname) {
+        ImportJob job = new ImportJob();
+        job.setType("user_import");
+        job.setState("running");
+        job.setStage("enumeration");
+        job.setMessage("Запуск...");
+        jobRepo.save(job);
+
+        if (!activeImports.tryStart(username, job.getId())) {
+            jobRepo.delete(job);
+            throw new IllegalStateException("Импорт уже выполняется");
+        }
+
+        try {
+            self.getObject().runUserImportAsync(job.getId(), importer, username, nickname);
+        } catch (RuntimeException e) {
+            activeImports.finish(username);
+            fail(job, e.getClass().getSimpleName());
+            throw e;
+        }
+        return job.getId();
+    }
+
+    @Async
+    public void runUserImportAsync(Long jobId, AnimeListImporter importer, String username, String nickname) {
+        try {
+            AnimeListImporter.ImportResult result = runUserImport(jobId, importer, username, nickname);
+            changeJob(
+                    jobId,
+                    job -> finish(
+                            job,
+                            "Импортировано: " + result.count() + " (" + importer.sourceName() + ": " + result.nickname()
+                                    + ")"));
+        } catch (Exception e) {
+            log.error("Импорт списка пользователя {} провалился", username, e);
+            changeJob(jobId, job -> fail(job, e.getClass().getSimpleName()));
+        } finally {
+            activeImports.finish(username);
+        }
+    }
+
+    private AnimeListImporter.ImportResult runUserImport(
+            Long jobId, AnimeListImporter importer, String username, String nickname) {
+        AnimeListImporter.ImportResult result =
+                importer.importList(nickname, loaded -> onLoaded(jobId, username, loaded));
+
+        progress(jobId, "saving", 0, result.count(), "Сохранение " + result.count() + " записей...");
+        userListService.replaceUserList(username, importer.sourceName(), result);
+        enrichmentWorker.trigger();
+        return result;
+    }
+
+    private void onLoaded(Long jobId, String username, int loaded) {
+        activeImports.touch(username);
+        String message = loaded > 0 ? "Загружено " + loaded + " записей" : "Загрузка списка...";
+        progress(jobId, "enumeration", loaded, null, message);
+    }
+
+    private void progress(Long jobId, String stage, int processed, Integer total, String message) {
+        changeJob(jobId, job -> {
+            job.setStage(stage);
+            job.setProcessedCount(processed);
+            job.setTotalEstimate(total);
+            job.setMessage(message);
+            jobRepo.save(job);
+        });
+    }
+
+    private void changeJob(Long jobId, Consumer<ImportJob> change) {
+        jobRepo.findById(jobId).ifPresentOrElse(change, () -> log.warn("Задача импорта {} не найдена", jobId));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ImportJob> jobById(Long jobId) {
+        return jobRepo.findById(jobId);
     }
 
     public Long startSiteImport() {

@@ -9,11 +9,16 @@ public interface AnimeListImporter {
 
     ImportResult importList(String nickname);
 
-    default ImportResult importList(String nickname, Runnable onProgress) {
+    default ImportResult importList(String nickname, ProgressListener onProgress) {
         return importList(nickname);
     }
 
     AnimeCatalogService.AnimePatch fetchFull(long sourceId);
+
+    @FunctionalInterface
+    interface ProgressListener {
+        void loaded(int loaded);
+    }
 
     record ImportResult(long userId, String nickname, int count, List<RatingEntry> ratings) {}
 

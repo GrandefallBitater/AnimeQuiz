@@ -79,7 +79,7 @@ class ShikimoriServiceTest {
                 [{"id":1,"status":"completed","anime":{"id":100}}]""");
 
         AtomicInteger progress = new AtomicInteger();
-        service.importList("alice", progress::incrementAndGet);
+        service.importList("alice", loaded -> progress.incrementAndGet());
 
         assertThat(progress.get()).isEqualTo(1);
     }

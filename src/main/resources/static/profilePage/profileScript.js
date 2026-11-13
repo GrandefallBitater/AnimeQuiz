@@ -415,20 +415,40 @@ $(document).ready(function () {
         _etaSamples = [];
     }
 
-    function startPosterPolling() {
+    function startPosterPolling(announceImport) {
         resetEta();
         let attempts = 0;
+        let sawRunning = false;
+        let importReported = false;
+        const expectImport = announceImport === true;
+
         const timer = setInterval(function () {
             attempts++;
             $.get('/profile/import/status', function (s) {
                 if (s.running) {
-                    showImportRunning();
+                    sawRunning = true;
+                    showImportProgress(s);
                     return;
                 }
+
+                const info = s.import;
+                if (info && (expectImport || sawRunning) && !importReported) {
+                    importReported = true;
+                    resetEta();
+                    loadPage(true);
+                    if (info.state === 'failed') {
+                        clearInterval(timer);
+                        $('#globalImportProgress').fadeOut(500);
+                        showToast(info.error ? 'Импорт не удался: ' + info.error : 'Импорт не удался', 'error');
+                        return;
+                    }
+                    showToast(info.message || 'Импорт завершён', 'success');
+                }
+
                 if (s.total > 0) {
                     showGlobalProgress(s.ready, s.total, s.hidden);
                 }
-                if (s.done || attempts > 120) {
+                if (s.done || attempts > 240) {
                     clearInterval(timer);
                     if (s.done) {
                         $('#globalImportProgress').fadeOut(500);
@@ -441,18 +461,28 @@ $(document).ready(function () {
                 }
             }).fail(function () {
             });
-        }, 3000);
+        }, 2500);
     }
 
-    function showImportRunning() {
+    function showImportProgress(s) {
         const $prog = $('#globalImportProgress');
         if (!$prog.length) return;
+
+        const info  = s.import || {};
+        const total = info.total;
+        const done  = info.processed || 0;
+        const text  = info.message || 'Загрузка списка...';
+        const $bar  = $prog.find('.import-progress-bar');
+
         $prog.show();
-        $prog.find('.import-progress-bar')
-            .addClass('indeterminate')
-            .css('width', '');
-        $prog.find('.import-progress-text')
-            .text('Сохранение списка...');
+        if (total > 0) {
+            const pct = Math.min(100, Math.round(done / total * 100));
+            $bar.removeClass('indeterminate').css('width', pct + '%');
+            $prog.find('.import-progress-text').text(text + ' (' + pct + '%)');
+        } else {
+            $bar.addClass('indeterminate').css('width', '');
+            $prog.find('.import-progress-text').text(text);
+        }
     }
 
     function activateTab(target) {
@@ -605,11 +635,10 @@ $(document).ready(function () {
                 dataType: 'json'
             })
                 .done(function (resp) {
-                    showToast(resp.message || 'Импорт запущен', 'success');
-                    $prog.find('.import-progress-text').text('Список загружен, постеры в фоне...');
+                    showToast(resp.message || 'Импорт запущен', 'info');
+                    $prog.find('.import-progress-text').text('Загрузка списка...');
 
-                    loadPage(true);
-                    startPosterPolling();
+                    startPosterPolling(true);
                 })
                 .fail(function (xhr) {
                     let msg = 'Ошибка импорта';
@@ -657,7 +686,7 @@ $(document).ready(function () {
         $.get('/profile/import/status', function (s) {
             if (!s) return;
             if (s.running) {
-                showImportRunning();
+                showImportProgress(s);
                 startPosterPolling();
             } else if (s.total > 0 && !s.done) {
                 showGlobalProgress(s.ready, s.total, s.hidden);

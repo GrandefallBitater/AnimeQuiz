@@ -73,7 +73,7 @@ class MalServiceTest {
                 [{"anime_id":100,"status":2}]""");
 
         AtomicInteger progress = new AtomicInteger();
-        service.importList("alice", progress::incrementAndGet);
+        service.importList("alice", loaded -> progress.incrementAndGet());
 
         assertThat(progress.get()).isEqualTo(1);
     }

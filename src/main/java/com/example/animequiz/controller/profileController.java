@@ -1,13 +1,14 @@
 package com.example.animequiz.controller;
 
+import com.example.animequiz.entity.ImportJob;
 import com.example.animequiz.entity.User;
 import com.example.animequiz.exceptions.InvalidInputException;
 import com.example.animequiz.repository.UserRepository;
 import com.example.animequiz.service.ActiveUserImports;
 import com.example.animequiz.service.AuthService;
+import com.example.animequiz.service.ImportJobService;
 import com.example.animequiz.service.StorageService;
 import com.example.animequiz.service.UserListService;
-import com.example.animequiz.service.enrichment.EnrichmentWorker;
 import com.example.animequiz.service.importer.AnimeListImporter;
 import com.example.animequiz.validation.InputValidation;
 import jakarta.servlet.http.Cookie;
@@ -54,28 +55,28 @@ public class profileController {
     private final UserRepository userRepository;
     private final StorageService storageService;
     private final UserListService userListService;
-    private final EnrichmentWorker enrichmentWorker;
     private final AuthService authService;
     private final Map<String, AnimeListImporter> importers;
     private final ActiveUserImports activeImports;
+    private final ImportJobService importJobService;
 
     @Autowired
     public profileController(
             UserRepository userRepository,
             StorageService storageService,
             UserListService userListService,
-            EnrichmentWorker enrichmentWorker,
             AuthService authService,
             List<AnimeListImporter> importersList,
-            ActiveUserImports activeImports) {
+            ActiveUserImports activeImports,
+            ImportJobService importJobService) {
         this.userRepository = userRepository;
         this.storageService = storageService;
         this.userListService = userListService;
-        this.enrichmentWorker = enrichmentWorker;
         this.authService = authService;
         this.importers = importersList.stream()
                 .collect(Collectors.toMap(i -> i.sourceName().toLowerCase(), i -> i));
         this.activeImports = activeImports;
+        this.importJobService = importJobService;
     }
 
     @PostMapping("/setCustomName")
@@ -122,28 +123,25 @@ public class profileController {
         if (!AuthService.isAuthenticated(auth)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Требуется вход в аккаунт"));
         }
+        if (nickname == null || nickname.isBlank()) {
+            throw new InvalidInputException("Укажите никнейм");
+        }
 
         String username = auth.getName();
-        activeImports.start(username);
+        AnimeListImporter importer = importerFor(source);
+        Long jobId;
         try {
-            AnimeListImporter importer = importerFor(source);
-            AnimeListImporter.ImportResult result = importer.importList(nickname, () -> activeImports.touch(username));
-
-            userListService.replaceUserList(username, importer.sourceName(), result);
-            enrichmentWorker.trigger();
-
-            Map<String, Object> resp = new LinkedHashMap<>();
-            resp.put(
-                    "message",
-                    "Импортировано: " + result.count() + " (" + importer.sourceName() + ": " + result.nickname() + ")");
-            resp.put("count", result.count());
-            resp.put("nickname", result.nickname());
-            resp.put("source", importer.sourceName());
-            return ResponseEntity.ok(resp);
-
-        } finally {
-            activeImports.finish(username);
+            jobId = importJobService.startUserImport(username, importer, nickname.trim());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
         }
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("message", "Импорт запущен");
+        resp.put("jobId", jobId);
+        resp.put("source", importer.sourceName());
+        resp.put("nickname", nickname.trim());
+        return ResponseEntity.accepted().body(resp);
     }
 
     @GetMapping("/profile/titles")
@@ -197,16 +195,37 @@ public class profileController {
         if (!AuthService.isAuthenticated(auth))
             return ResponseEntity.status(401).build();
 
-        boolean running = activeImports.isRunning(auth.getName());
-        UserListService.UserListView view = userListService.getUserListView(auth.getName());
+        String username = auth.getName();
+        boolean running = activeImports.isRunning(username);
+        UserListService.UserListView view = userListService.getUserListView(username);
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("running", running);
+        activeImports
+                .lastJobId(username)
+                .flatMap(importJobService::jobById)
+                .ifPresent(job -> resp.put("import", importState(job)));
         resp.put("total", view.totalCount());
         resp.put("ready", view.titles().size());
         resp.put("hidden", view.hiddenCount());
         resp.put("done", !running && view.hiddenCount() == 0);
         return ResponseEntity.ok(resp);
+    }
+
+    private static Map<String, Object> importState(ImportJob job) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("jobId", job.getId());
+        state.put("state", job.getState());
+        state.put("stage", job.getStage());
+        state.put("processed", job.getProcessedCount());
+        state.put("total", job.getTotalEstimate());
+        state.put("message", job.getMessage());
+        state.put("error", job.getError());
+        if (job.getStartedAt() != null)
+            state.put("startedAt", job.getStartedAt().toString());
+        if (job.getFinishedAt() != null)
+            state.put("finishedAt", job.getFinishedAt().toString());
+        return state;
     }
 
     @PostMapping("/profile/name")

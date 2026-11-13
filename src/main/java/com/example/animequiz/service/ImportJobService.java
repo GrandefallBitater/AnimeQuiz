@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -30,6 +31,8 @@ public class ImportJobService {
     private final AnimeCatalogService catalog;
     private final EnrichmentWorker enrichmentWorker;
     private final ObjectProvider<ImportJobService> self;
+    // Held while an import is running, so two concurrent requests cannot start the same job.
+    private final AtomicBoolean importRunning = new AtomicBoolean(false);
 
     @PostConstruct
     public void init() {
@@ -54,19 +57,35 @@ public class ImportJobService {
         if (currentRunning("site_import").isPresent()) {
             throw new IllegalStateException("Импорт уже выполняется");
         }
-        ImportJob job = new ImportJob();
-        job.setType("site_import");
-        job.setState("running");
-        job.setStage("enumeration");
-        job.setMessage("Запуск...");
-        jobRepo.save(job);
+        if (!importRunning.compareAndSet(false, true)) {
+            throw new IllegalStateException("Импорт уже выполняется");
+        }
+        try {
+            ImportJob job = new ImportJob();
+            job.setType("site_import");
+            job.setState("running");
+            job.setStage("enumeration");
+            job.setMessage("Запуск...");
+            jobRepo.save(job);
 
-        self.getObject().runSiteImportAsync(job.getId());
-        return job.getId();
+            self.getObject().runSiteImportAsync(job.getId());
+            return job.getId();
+        } catch (RuntimeException e) {
+            importRunning.set(false);
+            throw e;
+        }
     }
 
     @Async
     public void runSiteImportAsync(Long jobId) {
+        try {
+            runSiteImport(jobId);
+        } finally {
+            importRunning.set(false);
+        }
+    }
+
+    private void runSiteImport(Long jobId) {
         ImportJob job = jobRepo.findById(jobId).orElseThrow();
         try {
             update(job, "enumeration", 0, null, "Перечисление каталога Shikimori...");

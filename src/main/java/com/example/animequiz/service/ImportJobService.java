@@ -6,6 +6,7 @@ import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.enrichment.EnrichmentWorker;
 import com.example.animequiz.service.importer.ShikimoriService;
 import com.example.animequiz.service.importer.YummyAnimeService;
+import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -29,6 +30,14 @@ public class ImportJobService {
     private final AnimeCatalogService catalog;
     private final EnrichmentWorker enrichmentWorker;
     private final ObjectProvider<ImportJobService> self;
+
+    @PostConstruct
+    public void init() {
+        int countOfFailedJobs = jobRepo.failAllRunningJobs(Instant.now(), "Прервано перезапуском приложения");
+        if (countOfFailedJobs > 0) {
+            log.warn("{} импортов помечено как проваленные", countOfFailedJobs);
+        }
+    }
 
     @Transactional(readOnly = true)
     public Optional<ImportJob> currentRunning(String type) {

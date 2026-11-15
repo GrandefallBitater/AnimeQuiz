@@ -33,13 +33,20 @@
 
     <form id="registerForm">
         <div class="form-group">
-            <label for="regUsername">Никнейм</label>
-            <input type="text"
-                   id="regUsername"
-                   class="form-input"
-                   placeholder="Придумайте никнейм"
-                   required
-                   autocomplete="username">
+            <label for="regUsername">Логин</label>
+            <div class="input-with-hint">
+                <input type="text"
+                       id="regUsername"
+                       class="form-input"
+                       placeholder="Придумайте логин"
+                       required
+                       autocomplete="username">
+                <span class="field-hint" tabindex="0" role="img"
+                      aria-label="Вход в аккаунт выполняется только по логину. Логин нельзя изменить."
+                      data-tooltip="Вход в аккаунт выполняется только по логину. Логин нельзя изменить.">
+                    <img th:src="@{server-images/question-mark.svg}" alt="" width="16" height="16">
+                </span>
+            </div>
         </div>
 
         <div class="form-group">

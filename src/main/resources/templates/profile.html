@@ -52,8 +52,15 @@
                              class="summary-avatar"
                              alt="Аватар"
                              th:src="${hasAvatar} ? @{/profile/avatar} : @{server-images/anime-logo.png}">
-                        <div class="summary-name">
-                            <span id="profileDisplayName" th:text="${displayName}">User</span>
+                        <div class="summary-identity">
+                            <div class="identity-field" th:if="${authenticated}">
+                                <span class="identity-label">Логин</span>
+                                <span class="identity-login" id="profileUsername" th:text="${username}">username</span>
+                            </div>
+                            <div class="identity-field">
+                                <span class="identity-label">Отображаемое имя</span>
+                                <span class="identity-display-name" id="profileDisplayName" th:text="${displayName}">User</span>
+                            </div>
                             <span th:if="${authenticated and userRole != null}"
                                   class="role-badge"
                                   th:classappend="${userRole == 'ADMIN'} ? 'role-admin' : 'role-user'"

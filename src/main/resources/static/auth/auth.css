@@ -129,6 +129,98 @@ body {
     letter-spacing: 0.5px;
 }
 
+.input-with-hint { position: relative; }
+
+.input-with-hint .form-input { padding-right: 2.9rem; }
+
+.field-hint {
+    position: absolute;
+    top: 50%;
+    right: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    cursor: help;
+    outline: none;
+    border-radius: 50%;
+    transform: translateY(-50%);
+    transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.field-hint:hover,
+.field-hint:focus-visible {
+    transform: translateY(-50%) scale(1.12);
+    filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.65));
+}
+
+.field-hint img {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.field-hint::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    right: -2px;
+    bottom: calc(100% + 10px);
+    width: 200px;
+    max-width: calc(100vw - 4.5rem);
+    padding: 0.55rem 0.75rem;
+    border-radius: 10px;
+    background: rgba(20, 18, 42, 0.98);
+    border: 1px solid rgba(168, 85, 247, 0.45);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    color: #e6e2ff;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.45;
+    letter-spacing: 0.2px;
+    text-align: left;
+    white-space: normal;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.field-hint::before {
+    content: '';
+    position: absolute;
+    right: 5px;
+    bottom: calc(100% + 2px);
+    width: 8px;
+    height: 8px;
+    background: rgba(20, 18, 42, 0.98);
+    border-right: 1px solid rgba(168, 85, 247, 0.45);
+    border-bottom: 1px solid rgba(168, 85, 247, 0.45);
+    transform: rotate(45deg);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.18s ease, visibility 0.18s;
+    pointer-events: none;
+    z-index: 11;
+}
+
+.field-hint:hover::after,
+.field-hint:focus-visible::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.field-hint:hover::before,
+.field-hint:focus-visible::before {
+    opacity: 1;
+    visibility: visible;
+}
+
+
 .form-input {
     width: 100%;
     background: rgba(13, 13, 26, 0.85);

@@ -102,6 +102,7 @@ public class profileController {
         model.addAttribute("displayName", displayName(auth, request));
         model.addAttribute("authenticated", AuthService.isAuthenticated(auth));
         model.addAttribute("hasAvatar", storageService.findAvatar(key).isPresent());
+        model.addAttribute("username", auth != null ? auth.getName() : null);
         if (AuthService.isAuthenticated(auth)) {
             userRepository.findByUsername(auth.getName()).ifPresent(u -> {
                 boolean isAdmin = u.getAuthorities().stream().anyMatch(a -> {

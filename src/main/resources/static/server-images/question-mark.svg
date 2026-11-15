@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="Подсказка">
+    <defs>
+        <linearGradient id="question-bg" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#A855F7"/>
+            <stop offset="1" stop-color="#FF6B9D"/>
+        </linearGradient>
+    </defs>
+    <circle cx="12" cy="12" r="11" fill="url(#question-bg)"/>
+    <path d="M9.4 9.1a2.8 2.8 0 0 1 5.45.9c0 1.85-2.65 2.15-2.65 4"
+          stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="12.2" cy="17.2" r="1.2" fill="#ffffff"/>
+</svg>

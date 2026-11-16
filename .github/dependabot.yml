@@ -10,6 +10,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Major upgrades break the build and need a migration, so request them by hand.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
     groups:
       maven:
         patterns:
@@ -22,6 +27,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Major upgrades break the build and need a migration, so request them by hand.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
     groups:
       actions:
         patterns:

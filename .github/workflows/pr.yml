@@ -1,0 +1,39 @@
+name: Pull request checks
+
+# Pull requests into the integration and release branches. They run on a
+# GitHub-hosted runner: the code of a pull request must never run on the
+# personal machine that hosts the self-hosted runner.
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    uses: ./.github/workflows/_checks.yml
+    with:
+      runner: '["ubuntu-latest"]'
+      branch: ${{ github.head_ref }}
+      # Only the release branch requires a version bump.
+      versionBaseRef: ${{ github.base_ref == 'main' && 'origin/main' || '' }}
+
+  workflows:
+    name: workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # actionlint validates the YAML of the workflow files themselves.
+      - name: Lint the workflow files
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12

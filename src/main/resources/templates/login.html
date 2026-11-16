@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>Вход — AnimeQuiz</title>
+    <link rel="icon" type="image/png" th:href="@{server-images/anime-logo.png}">
+    <link rel="stylesheet" th:href="@{/auth/auth.css}">
+    <link rel="stylesheet" th:href="@{toast.css}">
+    <link rel="stylesheet" th:href="@{floating_icons.css}">
+</head>
+<body>
+
+<div class="global-floating-icons">
+    <span>⚔️</span><span>🌸</span><span>🎮</span><span>⭐</span>
+    <span>🔥</span><span>💫</span><span>🍥</span><span>👻</span>
+</div>
+
+<div class="auth-card">
+    <div class="auth-header">
+        <div class="auth-logo"></div>
+        <h1 class="auth-title">Добро пожаловать!</h1>
+        <p class="auth-subtitle">Войдите, чтобы получить доступ к новым функциям</p>
+    </div>
+
+    <div th:if="${errorMessage}" class="auth-alert auth-alert-error" id="errorAlert">
+        <span></span>
+        <span th:text="${errorMessage}">Ошибка</span>
+    </div>
+
+    <div th:if="${infoMessage}" class="auth-alert auth-alert-info" id="infoAlert">
+        <span></span>
+        <span th:text="${infoMessage}">Сообщение</span>
+    </div>
+
+    <div th:if="${param.logout}" class="auth-alert auth-alert-success">
+        <span>Вы успешно вышли из аккаунта!</span>
+    </div>
+
+    <form id="loginForm" th:action="@{/login}" method="post">
+        <div class="form-group">
+            <label for="username">Логин</label>
+            <div class="input-with-hint">
+                <input type="text"
+                       id="username"
+                       name="username"
+                       class="form-input"
+                       placeholder="Введите логин"
+                       required
+                       autocomplete="username">
+                <span class="field-hint" tabindex="0" role="img"
+                      aria-label="Вход в аккаунт выполняется только по логину. Логин нельзя изменить."
+                      data-tooltip="Вход в аккаунт выполняется только по логину. Логин нельзя изменить.">
+                    <img th:src="@{server-images/question-mark.svg}" alt="" width="16" height="16">
+                </span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="password">Пароль</label>
+            <div class="password-wrap">
+                <input type="password"
+                       id="password"
+                       name="password"
+                       class="form-input"
+                       placeholder="Введите пароль"
+                       required
+                       autocomplete="current-password">
+                <button type="button"
+                        class="password-toggle"
+                        aria-label="Показать пароль"
+                        title="Показать пароль"
+                        aria-pressed="false">
+                    <svg class="lock-closed" viewBox="0 0 24 24" width="20" height="20"
+                         fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    <svg class="lock-open" viewBox="0 0 24 24" width="20" height="20"
+                         fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-auth" id="loginBtn">
+            <span>Войти</span>
+            <span>→</span>
+        </button>
+    </form>
+
+    <div class="auth-switch">
+        Нет аккаунта? <a th:href="@{/register}">Создать аккаунт</a>
+    </div>
+    <div class="auth-switch">
+        хотите продолжить как гость? <a th:href="@{/}">на главную</a>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script type="text/javascript" th:src="@{jquery.min.js}"></script>
+<script th:src="@{toast.js}"></script>
+<script th:src="@{pageVisibility.js}"></script>
+<script th:src="@{/auth/authScript.js}"></script>
+</body>
+</html>

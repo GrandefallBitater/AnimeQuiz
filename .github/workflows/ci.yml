@@ -1,0 +1,26 @@
+name: Checks
+
+# Every branch except the integration branches: checks only, no deployment.
+on:
+  push:
+    branches-ignore:
+      - main
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    # A deleted branch also produces a push event; there is nothing to check.
+    if: github.event_name != 'push' || github.event.deleted == false
+    uses: ./.github/workflows/_checks.yml
+    with:
+      runner: '["self-hosted","Windows","X64"]'
+      branch: ${{ github.ref_name }}
+      commitRange: ${{ github.event.before || 'origin/dev' }}..${{ github.sha }}

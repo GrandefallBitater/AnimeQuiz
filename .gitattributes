@@ -1,0 +1,9 @@
+# Keep shell scripts and Docker files LF so they run inside Linux containers.
+*.sh text eol=lf
+Dockerfile text eol=lf
+compose.yaml text eol=lf
+*.example text eol=lf
+scripts/backup/crontab text eol=lf
+*.java text eol=lf
+# Minified third-party libraries are vendored, not project code; keep them out of GitHub language stats.
+*.min.js linguist-vendored linguist-generated

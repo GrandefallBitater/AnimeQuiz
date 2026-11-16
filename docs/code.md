@@ -95,7 +95,8 @@ src/main/java/com/example/animequiz/
 ### `securityConfig.AsyncConfig`
 Пул `taskExecutor`: ядро 4, максимум 12, очередь 200, префикс `async-`,
 обёрнут в `DelegatingSecurityContextAsyncTaskExecutor`, чтобы в `@Async` был
-доступен `SecurityContext`. Этим пулом пользуются задачи импорта.
+доступен `SecurityContext`. Этим пулом пользуются задачи импорта и пачки
+обогащения каталога.
 
 ### `securityConfig.AuthenticationFailureHandler`
 Переводит исключение входа в код в URL: `BadCredentials → ?error=credentials`,
@@ -356,10 +357,19 @@ sequenceDiagram
 ## 9. Сервисы: обогащение, постеры, хранилище
 
 ### `enrichment.EnrichmentWorker`
-Раз в 15 секунд берёт до 40 тайтлов из `findEnrichQueue` и обогащает каждый в
-отдельной транзакции (`REQUIRES_NEW`), чтобы одна ошибка не откатывала пачку.
+Раз в 15 секунд (`fixedRateString = PT15S`) берёт до 40 тайтлов из
+`findEnrichQueue` и обогащает каждый в отдельной транзакции (`REQUIRES_NEW`),
+чтобы одна ошибка не откатывала пачку.
 
-- Пропускает работу, пока идёт `site_import`.
+- `tick()` намеренно остаётся на потоке планировщика и делает только дешёвую
+  часть: проверяет, не идёт ли `site_import`. Сама пачка уходит в пул
+  `taskExecutor` через `self.getObject().processTick()` (`@Async`): прямой
+  вызов `this` прокси не обходит и оставил бы пачку на единственном потоке
+  планировщика, задерживая `purgeStale` и `purgeIdleSessions`.
+- `fixedRate`, а не `fixedDelay`: тик возвращается сразу после постановки
+  задачи, поэтому «15 секунд после завершения» перестало быть правдой —
+  проверки выполняются каждые 15 секунд, а лишние задачи отсекает флаг
+  `running`.
 - Флаг `triggerRequested` позволяет разбудить цикл сразу после импорта;
   одновременно работает не больше одного прохода.
 - Источники по порядку: Shikimori (если есть id и ещё не было), Yummy
@@ -573,7 +583,7 @@ startedAt, finishedAt}, total, ready, hidden, done
 
 | Задача | Период | Где |
 |---|---|---|
-| Обогащение каталога | `PT15S` | `EnrichmentWorker.tick` |
+| Обогащение каталога | `PT15S` | `EnrichmentWorker.tick` (проверки; пачка — в `taskExecutor`) |
 | Чистка устаревших записей импорта | `PT5M` | `ActiveUserImports.purgeStale` |
 | Чистка реестра сессий | `PT10M` | `SessionService.purgeIdleSessions` |
 | Пометка прерванных импортов | один раз при старте | `ImportJobService.init` |
@@ -581,7 +591,8 @@ startedAt, finishedAt}, total, ready, hidden, done
 
 Планировщик один на процесс: `@EnableScheduling` включает
 `ThreadPoolTaskScheduler` по умолчанию с одним потоком, поэтому длинные задачи
-в `@Scheduled` блокируют остальные тики.
+в `@Scheduled` блокируют остальные тики. Именно поэтому `EnrichmentWorker.tick`
+держит в `@Scheduled` только проверки, а пачку отдаёт в `taskExecutor`.
 
 ## 15. Тесты
 
@@ -606,7 +617,8 @@ Spotless входит в `verify`, поэтому форматирование �
 
 - **`@Async` и `@Transactional` только через прокси.** Внутри класса вызывать
   их через `this` нельзя: `ImportJobService` использует
-  `self.getObject()`, `EnrichmentWorker` — так же для `enrichOne`.
+  `self.getObject()`, `EnrichmentWorker` — так же для `enrichOne` и
+  `processTick`.
 - **Один активный импорт на пользователя.** Захват — только `tryStart`;
   любые новые пути запуска обязаны проходить через него, иначе появятся две
   задачи на одного человека.

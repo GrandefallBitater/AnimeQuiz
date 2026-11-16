@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -45,12 +46,21 @@ public class EnrichmentWorker {
         triggerRequested.set(true);
     }
 
-    @Scheduled(fixedDelayString = "PT15S")
+    @Scheduled(fixedRateString = "PT15S")
     public void tick() {
         if (jobRepo.findFirstByTypeAndStateOrderByIdDesc("site_import", "running")
                 .isPresent()) {
             return;
         }
+        try {
+            self.getObject().processTick();
+        } catch (Exception e) {
+            log.warn("Enrichment tick не поставлен в очередь, повтор на следующем тике: {}", e.toString());
+        }
+    }
+
+    @Async
+    public void processTick() {
         boolean triggered = triggerRequested.getAndSet(false);
         if (!triggered && !running.compareAndSet(false, true)) return;
         if (triggered && !running.compareAndSet(false, true)) {

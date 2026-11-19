@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import com.example.animequiz.entity.ImportJob;
 import com.example.animequiz.exceptions.ExternalServiceException;
+import com.example.animequiz.exceptions.NotFoundException;
 import com.example.animequiz.repository.ImportJobRepository;
 import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.enrichment.EnrichmentWorker;
@@ -164,7 +165,7 @@ class ImportJobServiceTest {
         service.runSiteImportAsync(1L);
 
         assertThat(job.getState()).isEqualTo("failed");
-        assertThat(job.getError()).isEqualTo("ExternalServiceException");
+        assertThat(job.getError()).isEqualTo("boom");
         assertThat(job.getFinishedAt()).isNotNull();
         verify(enrichmentWorker, never()).trigger();
     }
@@ -231,7 +232,7 @@ class ImportJobServiceTest {
 
         verify(activeImports).finish("alice");
         assertThat(saved[0].getState()).isEqualTo("failed");
-        assertThat(saved[0].getError()).isEqualTo("RejectedExecutionException");
+        assertThat(saved[0].getError()).isEqualTo("Не удалось выполнить импорт");
     }
 
     @Test
@@ -293,11 +294,26 @@ class ImportJobServiceTest {
         service.runUserImportAsync(1L, importer, "alice", "shiki-nick");
 
         assertThat(job.getState()).isEqualTo("failed");
-        assertThat(job.getError()).isEqualTo("ExternalServiceException");
+        assertThat(job.getError()).isEqualTo("boom");
         assertThat(job.getFinishedAt()).isNotNull();
         verify(activeImports).finish("alice");
         verify(userListService, never()).replaceUserList(any(), any(), any());
         verify(enrichmentWorker, never()).trigger();
+    }
+
+    @Test
+    void runUserImportAsyncKeepsTheUserFacingTextOfADomainFailure() {
+        ImportJob job = job(1L);
+        AnimeListImporter importer = mock(AnimeListImporter.class);
+        when(jobRepo.findById(1L)).thenReturn(Optional.of(job));
+        when(jobRepo.save(any(ImportJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(importer.importList(anyString(), any()))
+                .thenThrow(new NotFoundException("Пользователь \"nobody\" не найден на Shikimori"));
+
+        service.runUserImportAsync(1L, importer, "alice", "shiki-nick");
+
+        assertThat(job.getState()).isEqualTo("failed");
+        assertThat(job.getError()).isEqualTo("Пользователь \"nobody\" не найден на Shikimori");
     }
 
     private static ImportJob job(Long id) {

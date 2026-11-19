@@ -1,6 +1,9 @@
 package com.example.animequiz.service;
 
 import com.example.animequiz.entity.ImportJob;
+import com.example.animequiz.exceptions.ExternalServiceException;
+import com.example.animequiz.exceptions.InvalidInputException;
+import com.example.animequiz.exceptions.NotFoundException;
 import com.example.animequiz.repository.ImportJobRepository;
 import com.example.animequiz.service.catalog.AnimeCatalogService;
 import com.example.animequiz.service.enrichment.EnrichmentWorker;
@@ -74,7 +77,7 @@ public class ImportJobService {
             self.getObject().runUserImportAsync(job.getId(), importer, username, nickname);
         } catch (RuntimeException e) {
             activeImports.finish(username);
-            fail(job, e.getClass().getSimpleName());
+            fail(job, failureText(e));
             throw e;
         }
         return job.getId();
@@ -92,7 +95,7 @@ public class ImportJobService {
                                     + ")"));
         } catch (Exception e) {
             log.error("Импорт списка пользователя {} провалился", username, e);
-            changeJob(jobId, job -> fail(job, e.getClass().getSimpleName()));
+            changeJob(jobId, job -> fail(job, failureText(e)));
         } finally {
             activeImports.finish(username);
         }
@@ -220,7 +223,7 @@ public class ImportJobService {
             finish(job, "Импорт завершён. Постеры догружаются в фоне.");
         } catch (Exception e) {
             log.error("Site import failed", e);
-            fail(job, e.getClass().getSimpleName());
+            fail(job, failureText(e));
         }
     }
 
@@ -255,5 +258,14 @@ public class ImportJobService {
         fresh.setFinishedAt(Instant.now());
         fresh.setError(error);
         jobRepo.save(fresh);
+    }
+
+    private static String failureText(Throwable failure) {
+        if (failure instanceof NotFoundException
+                || failure instanceof InvalidInputException
+                || failure instanceof ExternalServiceException) {
+            return failure.getMessage();
+        }
+        return "Не удалось выполнить импорт";
     }
 }

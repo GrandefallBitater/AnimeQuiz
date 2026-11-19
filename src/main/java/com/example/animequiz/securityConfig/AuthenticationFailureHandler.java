@@ -1,5 +1,6 @@
 package com.example.animequiz.securityConfig;
 
+import com.example.animequiz.service.ratelimit.RateLimitExceededException;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,16 +19,23 @@ public class AuthenticationFailureHandler extends SimpleUrlAuthenticationFailure
     public void onAuthenticationFailure(
             HttpServletRequest request, HttpServletResponse response, AuthenticationException exception)
             throws IOException, ServletException {
+        saveException(request, exception);
+        getRedirectStrategy().sendRedirect(request, response, failureUrl(exception));
+    }
 
-        if (exception instanceof DisabledException) {
-            setDefaultFailureUrl("/login?error=disabled");
-        } else if (exception instanceof LockedException) {
-            setDefaultFailureUrl("/login?error=locked");
-        } else if (exception instanceof BadCredentialsException) {
-            setDefaultFailureUrl("/login?error=credentials");
-        } else {
-            setDefaultFailureUrl("/login?error");
+    private static String failureUrl(AuthenticationException exception) {
+        if (exception instanceof RateLimitExceededException rateLimit) {
+            return "/login?error=rate&retry=" + rateLimit.getRetryAfterSeconds();
         }
-        super.onAuthenticationFailure(request, response, exception);
+        if (exception instanceof DisabledException) {
+            return "/login?error=disabled";
+        }
+        if (exception instanceof LockedException) {
+            return "/login?error=locked";
+        }
+        if (exception instanceof BadCredentialsException) {
+            return "/login?error=credentials";
+        }
+        return "/login?error";
     }
 }

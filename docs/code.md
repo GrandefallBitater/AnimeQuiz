@@ -40,7 +40,7 @@ src/main/java/com/example/animequiz/
 │   ├── catalog/                  upsert и слияние тайтлов
 │   ├── enrichment/               фоновое дообогащение каталога
 │   ├── importer/                 Shikimori, MAL, Yummy + общий контракт
-│   └── ratelimit/                лимиты запросов к внешним API
+│   └── ratelimit/                лимиты входа/регистрации и запросов к внешним API
 ├── validation/                   проверка пользовательского ввода
 └── websocketConfig/              STOMP-эндпоинт и проверка Origin
 ```
@@ -100,8 +100,39 @@ src/main/java/com/example/animequiz/
 
 ### `securityConfig.AuthenticationFailureHandler`
 Переводит исключение входа в код в URL: `BadCredentials → ?error=credentials`,
-`Disabled → ?error=disabled`, `Locked → ?error=locked`, остальное `?error`.
-`AuthController` превращает код в текст на странице входа.
+`Disabled → ?error=disabled`, `Locked → ?error=locked`,
+`RateLimitExceeded → ?error=rate&retry=<секунды>`, остальное `?error`.
+URL вычисляется локально и сразу уходит в редирект, поэтому общее поле
+`setDefaultFailureUrl` у singleton-бина не используется. `AuthController`
+превращает код в текст на странице входа.
+
+### Лимиты входа, регистрации и импорта
+- `RateLimitProperties` — правила из `rate.limit.*`: `login.username`,
+  `login.ip`, `register.ip`, `imports.user`; у каждого правила `capacity` и
+  `window`. Bean Validation в проекте нет, поэтому значения проверяются в
+  компактных конструкторах record: опечатка в env роняет приложение на старте.
+- `RateLimitService` — `Cache` Guava по ключу `политика:ключ`, внутри —
+  бакет Bucket4j с `refillIntervally`, то есть жёстким окном: после исчерпания
+  попытки отклоняются до конца интервала. `reset` пересоздаёт бакет.
+- `Policy` — `LOGIN_USERNAME`, `LOGIN_IP`, `REGISTER_IP`, `IMPORT_USER`.
+- `RateLimitInterceptor` подключён в `RateLimitWebConfig` только к
+  `/auth/register` и `/profile/import/json`. В `preHandle` проверяет
+  `estimateAbilityToConsume`, токен списывает в `afterCompletion` и только при
+  2xx: неудачная валидация бюджет не тратит. Анонимный импорт пропускается —
+  401 отдаёт контроллер. Ключ: IP из `getRemoteAddr()` для регистрации, имя
+  аккаунта из `SecurityContext` для импорта.
+- `securityConfig.RateLimitedAuthenticationProvider` — наследник
+  `DaoAuthenticationProvider`: считает только неудачные попытки по никнейму и
+  по IP (IP берётся из `WebAuthenticationDetails`, `X-Forwarded-For` не
+  читается). Успешный вход обнуляет счётчик по никнейму. При исчерпании
+  бросает `RateLimitExceededException` с остатком ожидания.
+- Клиенты JSON получают 429 с `{"message", "retryAfter"}` и заголовком
+  `Retry-After`; форма входа — редирект с человекочитаемым текстом
+  (`WaitTime`: секунды до минуты, дальше минуты с округлением вверх).
+- Значения по умолчанию: 10 неудач/15 мин на никнейм и на IP, 3 регистрации в
+  час на IP, 15 импортов в час на аккаунт. Переопределяются переменными
+  `RATE_LIMIT_*` (см. `compose.yaml`). Состояние в памяти процесса и
+  обнуляется при деплое, как и сессии.
 
 ### `websocketConfig`
 - Брокер простой (в памяти), префикс назначения `/gameResponse`, очереди `/game`.

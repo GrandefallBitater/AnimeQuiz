@@ -3,6 +3,7 @@ package com.example.animequiz.securityConfig;
 import com.example.animequiz.repository.AuthoritiesRepository;
 import com.example.animequiz.repository.UserRepository;
 import com.example.animequiz.service.CustomUserDetailsService;
+import com.example.animequiz.service.ratelimit.RateLimitService;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 import lombok.Getter;
@@ -10,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.servlet.ServletListenerRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -101,12 +101,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public DaoAuthenticationProvider authenticationProvider(
-            UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
-        authProvider.setPasswordEncoder(passwordEncoder);
-        return authProvider;
+    public RateLimitedAuthenticationProvider authenticationProvider(
+            UserDetailsService userDetailsService, PasswordEncoder passwordEncoder, RateLimitService rateLimitService) {
+        return new RateLimitedAuthenticationProvider(userDetailsService, passwordEncoder, rateLimitService);
     }
 
     @Bean

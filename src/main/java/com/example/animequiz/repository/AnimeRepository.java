@@ -4,6 +4,8 @@ import com.example.animequiz.entity.Anime;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -18,10 +20,13 @@ public interface AnimeRepository extends JpaRepository<Anime, Long> {
     Optional<Anime> findByYummyId(Long yummyId);
 
     @Query("select a from Anime a where a.shikimoriId in :ids")
-    List<Anime> findAllByShikimoriIdIn(@Param("ids") List<Long> ids);
+    Set<Anime> findAllByShikimoriIdIn(@Param("ids") Set<Long> ids);
 
     @Query("select a from Anime a where a.malId in :ids")
-    List<Anime> findAllByMalIdIn(@Param("ids") List<Long> ids);
+    Set<Anime> findAllByMalIdIn(@Param("ids") Set<Long> ids);
+
+    @Query("select a from Anime a where a.yummyId in :ids")
+    Set<Anime> findAllByYummyIdIn(@Param("ids") Set<Long> ids);
 
     @Query(value = """
             SELECT a.* FROM anime a

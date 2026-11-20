@@ -3,6 +3,9 @@ package com.example.animequiz.service.catalog;
 import com.example.animequiz.entity.Anime;
 import com.example.animequiz.repository.AnimeRepository;
 import com.example.animequiz.repository.UserAnimeRepository;
+
+import java.lang.invoke.MethodHandles;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +24,7 @@ public class AnimeCatalogService {
     @Transactional(readOnly = true)
     public Map<Long, Anime> batchLookupByShikimoriIds(Collection<Long> ids) {
         if (ids == null || ids.isEmpty()) return Map.of();
-        return animeRepository.findAllByShikimoriIdIn(new ArrayList<>(ids)).stream()
+        return animeRepository.findAllByShikimoriIdIn(new HashSet<>(ids)).stream()
                 .filter(a -> a.getShikimoriId() != null)
                 .collect(Collectors.toMap(Anime::getShikimoriId, a -> a, (a, b) -> a));
     }
@@ -29,7 +32,7 @@ public class AnimeCatalogService {
     @Transactional(readOnly = true)
     public Map<Long, Anime> batchLookupByMalIds(Collection<Long> ids) {
         if (ids == null || ids.isEmpty()) return Map.of();
-        return animeRepository.findAllByMalIdIn(new ArrayList<>(ids)).stream()
+        return animeRepository.findAllByMalIdIn(new HashSet<>(ids)).stream()
                 .filter(a -> a.getMalId() != null)
                 .collect(Collectors.toMap(Anime::getMalId, a -> a, (a, b) -> a));
     }
@@ -71,6 +74,126 @@ public class AnimeCatalogService {
         return animeRepository.save(target);
     }
 
+    @Transactional
+    public List<Anime> upsertBatch(List<AnimePatch> patches) {
+        if (patches == null || patches.isEmpty()) return List.of();
+
+        AnimeLookup lookup = buildLookup(
+                loadByShikimoriIds(patches), loadByMalIds(patches), loadByYummyIds(patches));
+
+        LinkedHashSet<Anime> candidates = new LinkedHashSet<>();
+        for (AnimePatch patch : patches) {
+            Anime target = resolveTarget(findMatches(patch, lookup), candidates, lookup);
+            applyPatch(target, patch);
+            indexAnime(target, lookup);
+            candidates.add(target);
+        }
+        return animeRepository.saveAll(candidates);
+    }
+
+    private Anime resolveTarget(Set<Anime> matches, Set<Anime> candidates, AnimeLookup lookup) {
+        if (matches.isEmpty()) return new Anime();
+        if (matches.size() == 1) return matches.iterator().next();
+
+        List<Anime> ordered = new ArrayList<>(matches);
+        ordered.sort(Comparator.comparing((Anime a) -> a.getId() == null ? Long.MAX_VALUE : a.getId()));
+
+        Anime target = ordered.get(0);
+        for (int i = 1; i < ordered.size(); i++) {
+            absorb(target, ordered.get(i), candidates, lookup);
+        }
+        return target;
+    }
+
+    private void absorb(Anime keep, Anime drop, Set<Anime> candidates, AnimeLookup lookup) {
+        if (drop.getId() != null) {
+            merge(keep, drop);
+        } else {
+            copyMissingFields(keep, drop);
+        }
+        candidates.remove(drop);
+        repointLookup(lookup, drop, keep);
+    }
+
+    private void repointLookup(AnimeLookup lookup, Anime from, Anime to) {
+        replaceReferences(lookup.byShikimoriId(), from, to);
+        replaceReferences(lookup.byMalId(), from, to);
+        replaceReferences(lookup.byYummyId(), from, to);
+    }
+
+    private void replaceReferences(Map<Long, Anime> index, Anime from, Anime to) {
+        for (Map.Entry<Long, Anime> entry : index.entrySet()) {
+            if (entry.getValue() == from) entry.setValue(to);
+        }
+    }
+
+    private Set<Anime> loadByShikimoriIds(List<AnimePatch> patches) {
+        Set<Long> ids = patches.stream()
+                .map(AnimePatch::shikimoriId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        return ids.isEmpty() ? Set.of() : animeRepository.findAllByShikimoriIdIn(ids);
+    }
+
+    private Set<Anime> loadByMalIds(List<AnimePatch> patches) {
+        Set<Long> ids =
+                patches.stream().map(AnimePatch::malId).filter(Objects::nonNull).collect(Collectors.toSet());
+        return ids.isEmpty() ? Set.of() : animeRepository.findAllByMalIdIn(ids);
+    }
+
+    private Set<Anime> loadByYummyIds(List<AnimePatch> patches) {
+        Set<Long> ids = patches.stream()
+                .map(AnimePatch::yummyId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        return ids.isEmpty() ? Set.of() : animeRepository.findAllByYummyIdIn(ids);
+    }
+
+    private Set<Anime> findMatches(AnimePatch candidate, AnimeLookup lookup) {
+        Set<Anime> matches = new LinkedHashSet<>();
+
+        addIfPresent(matches, lookup.byShikimoriId(), candidate.shikimoriId());
+        addIfPresent(matches, lookup.byMalId(),       candidate.malId());
+        addIfPresent(matches, lookup.byYummyId(),     candidate.yummyId());
+
+        return matches;
+    }
+
+    private void addIfPresent(Set<Anime> matches, Map<Long, Anime> map, Long id) {
+        if (id != null) {
+            Anime found = map.get(id);
+            if (found != null) {
+                matches.add(found);
+            }
+        }
+    }
+
+    private record AnimeLookup(
+            Map<Long, Anime> byShikimoriId,
+            Map<Long, Anime> byMalId,
+            Map<Long, Anime> byYummyId
+    ) {}
+
+    private AnimeLookup buildLookup(Set<Anime> byShiki, Set<Anime> byMal, Set<Anime> byYummy) {
+        AnimeLookup lookup = new AnimeLookup(new HashMap<>(), new HashMap<>(), new HashMap<>());
+
+        indexAnimes(byShiki, lookup);
+        indexAnimes(byMal, lookup);
+        indexAnimes(byYummy, lookup);
+
+        return lookup;
+    }
+
+    private void indexAnimes(Set<Anime> animes, AnimeLookup lookup) {
+        for (Anime a : animes) indexAnime(a, lookup);
+    }
+
+    private void indexAnime(Anime a, AnimeLookup lookup) {
+        if (a.getShikimoriId() != null) lookup.byShikimoriId().put(a.getShikimoriId(), a);
+        if (a.getMalId() != null) lookup.byMalId().put(a.getMalId(), a);
+        if (a.getYummyId() != null) lookup.byYummyId().put(a.getYummyId(), a);
+    }
+
     private void applyPatch(Anime target, AnimePatch p) {
         if (target.getShikimoriId() == null && p.shikimoriId() != null) target.setShikimoriId(p.shikimoriId());
         if (target.getMalId() == null && p.malId() != null) target.setMalId(p.malId());
@@ -103,44 +226,33 @@ public class AnimeCatalogService {
         if (Objects.equals(keep.getId(), drop.getId())) return;
         log.info("Merge anime {} → {}", drop.getId(), keep.getId());
 
-        Long dShiki = drop.getShikimoriId();
-        Long dMal = drop.getMalId();
-        Long dYummy = drop.getYummyId();
-        String dName = drop.getName();
-        String dRussian = drop.getRussian();
-        String dKind = drop.getKind();
-        String dAir = drop.getAiringStatus();
-        Integer dEps = drop.getTotalEpisodes();
-        String dUrl = drop.getUrl();
-        String dHash = drop.getPosterHash();
-        String dExt = drop.getPosterExt();
-        String dMime = drop.getPosterMime();
-        String dPUrl = drop.getPosterUrl();
-        String dPStatus = drop.getPosterStatus();
-
         userAnimeRepository.transferUserAnime(drop.getId(), keep.getId());
 
         animeRepository.delete(drop);
         animeRepository.flush();
 
-        if (keep.getShikimoriId() == null) keep.setShikimoriId(dShiki);
-        if (keep.getMalId() == null) keep.setMalId(dMal);
-        if (keep.getYummyId() == null) keep.setYummyId(dYummy);
-        if (keep.getName() == null) keep.setName(dName);
-        if (keep.getRussian() == null) keep.setRussian(dRussian);
-        if (keep.getKind() == null) keep.setKind(dKind);
-        if (keep.getAiringStatus() == null) keep.setAiringStatus(dAir);
-        if (keep.getTotalEpisodes() == null) keep.setTotalEpisodes(dEps);
-        if (keep.getUrl() == null) keep.setUrl(dUrl);
-        if (keep.getPosterHash() == null && dHash != null) {
-            keep.setPosterHash(dHash);
-            keep.setPosterExt(dExt);
-            keep.setPosterMime(dMime);
-            keep.setPosterUrl(dPUrl);
-            keep.setPosterStatus(dPStatus);
-        }
+        copyMissingFields(keep, drop);
 
         animeRepository.save(keep);
+    }
+
+    private void copyMissingFields(Anime keep, Anime drop) {
+        if (keep.getShikimoriId() == null) keep.setShikimoriId(drop.getShikimoriId());
+        if (keep.getMalId() == null) keep.setMalId(drop.getMalId());
+        if (keep.getYummyId() == null) keep.setYummyId(drop.getYummyId());
+        if (keep.getName() == null) keep.setName(drop.getName());
+        if (keep.getRussian() == null) keep.setRussian(drop.getRussian());
+        if (keep.getKind() == null) keep.setKind(drop.getKind());
+        if (keep.getAiringStatus() == null) keep.setAiringStatus(drop.getAiringStatus());
+        if (keep.getTotalEpisodes() == null) keep.setTotalEpisodes(drop.getTotalEpisodes());
+        if (keep.getUrl() == null) keep.setUrl(drop.getUrl());
+        if (keep.getPosterHash() == null && drop.getPosterHash() != null) {
+            keep.setPosterHash(drop.getPosterHash());
+            keep.setPosterExt(drop.getPosterExt());
+            keep.setPosterMime(drop.getPosterMime());
+            keep.setPosterUrl(drop.getPosterUrl());
+            keep.setPosterStatus(drop.getPosterStatus());
+        }
     }
 
     private static String firstNonBlank(String... s) {

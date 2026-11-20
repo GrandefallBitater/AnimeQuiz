@@ -30,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ImportJobService {
 
+    private static final int CATALOG_BATCH = 500;
+
     private final ImportJobRepository jobRepo;
     private final ShikimoriService shikimori;
     private final YummyAnimeService yummy;
@@ -177,17 +179,17 @@ public class ImportJobService {
             update(job, "enumeration", 0, catalogPatches.size(), "Сохранение " + catalogPatches.size() + " тайтлов...");
 
             int saved = 0;
-            for (AnimeCatalogService.AnimePatch p : catalogPatches) {
-                catalog.upsert(p);
-                saved++;
-                if (saved % 100 == 0) {
-                    update(
-                            job,
-                            "enumeration",
-                            saved,
-                            catalogPatches.size(),
-                            "Сохранено " + saved + " / " + catalogPatches.size());
-                }
+            for (int i = 0; i < catalogPatches.size(); i += CATALOG_BATCH) {
+                List<AnimeCatalogService.AnimePatch> chunk = catalogPatches.subList(
+                        i, Math.min(i + CATALOG_BATCH, catalogPatches.size()));
+                catalog.upsertBatch(chunk);
+                saved += chunk.size();
+                update(
+                        job,
+                        "enumeration",
+                        saved,
+                        catalogPatches.size(),
+                        "Сохранено " + saved + " / " + catalogPatches.size());
             }
             update(job, "enumeration", saved, catalogPatches.size(), "Каталог Shikimori загружен");
 
@@ -203,7 +205,7 @@ public class ImportJobService {
                 List<Long> batch = shikiIds.subList(i, Math.min(i + batchSize, shikiIds.size()));
                 try {
                     List<AnimeCatalogService.AnimePatch> patches = yummy.fetchByShikimoriIds(batch);
-                    for (AnimeCatalogService.AnimePatch p : patches) catalog.upsert(p);
+                    catalog.upsertBatch(patches);
                 } catch (Exception e) {
                     log.warn("Yummy batch {} fail: {}", i / batchSize, e.toString());
                 }

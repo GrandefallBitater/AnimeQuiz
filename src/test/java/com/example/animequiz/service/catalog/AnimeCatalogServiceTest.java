@@ -10,9 +10,11 @@ import static org.mockito.Mockito.when;
 import com.example.animequiz.entity.Anime;
 import com.example.animequiz.repository.AnimeRepository;
 import com.example.animequiz.repository.UserAnimeRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -46,7 +48,7 @@ class AnimeCatalogServiceTest {
         Anime second = anime(2, 20L, null);
         Anime withoutShiki = anime(3, null, null);
 
-        when(animeRepository.findAllByShikimoriIdIn(any())).thenReturn(List.of(first, second, withoutShiki));
+        when(animeRepository.findAllByShikimoriIdIn(any())).thenReturn(Set.of(first, second, withoutShiki));
 
         assertThat(catalog.batchLookupByShikimoriIds(List.of(10L, 20L)))
                 .containsExactlyInAnyOrderEntriesOf(Map.of(10L, first, 20L, second));
@@ -57,7 +59,7 @@ class AnimeCatalogServiceTest {
         Anime first = anime(1, null, 10L);
         Anime second = anime(2, null, 20L);
 
-        when(animeRepository.findAllByMalIdIn(any())).thenReturn(List.of(first, second));
+        when(animeRepository.findAllByMalIdIn(any())).thenReturn(Set.of(first, second));
 
         assertThat(catalog.batchLookupByMalIds(List.of(10L, 20L)))
                 .containsExactlyInAnyOrderEntriesOf(Map.of(10L, first, 20L, second));
@@ -206,6 +208,137 @@ class AnimeCatalogServiceTest {
 
         assertThat(keep.getPosterHash()).isEqualTo("keep-hash");
         assertThat(keep.getPosterExt()).isEqualTo("png");
+    }
+
+    @Test
+    void upsertBatchReturnsEmptyForEmptyInput() {
+        assertThat(catalog.upsertBatch(List.of())).isEmpty();
+        assertThat(catalog.upsertBatch(null)).isEmpty();
+
+        verifyNoInteractions(animeRepository);
+    }
+
+    @Test
+    void upsertBatchCreatesTitlesForNewPatches() {
+        when(animeRepository.findAllByShikimoriIdIn(any())).thenReturn(Set.of());
+        when(animeRepository.findAllByMalIdIn(any())).thenReturn(Set.of());
+        stubSaveAll();
+
+        List<Anime> saved = catalog.upsertBatch(List.of(
+                AnimeCatalogService.AnimePatch.builder()
+                        .shikimoriId(1L)
+                        .malId(11L)
+                        .name("One")
+                        .build(),
+                AnimeCatalogService.AnimePatch.builder()
+                        .shikimoriId(2L)
+                        .malId(12L)
+                        .name("Two")
+                        .build()));
+
+        assertThat(saved).hasSize(2);
+        assertThat(saved).extracting(Anime::getShikimoriId).containsExactlyInAnyOrder(1L, 2L);
+        assertThat(saved).extracting(Anime::getTitle).containsExactlyInAnyOrder("One", "Two");
+    }
+
+    @Test
+    void upsertBatchUpdatesExistingTitleWithSingleLookup() {
+        Anime existing = anime(1, 10L, null);
+        existing.setName("Old name");
+        existing.setTitle("Old title");
+        when(animeRepository.findAllByShikimoriIdIn(any())).thenReturn(Set.of(existing));
+        stubSaveAll();
+
+        List<Anime> saved = catalog.upsertBatch(List.of(
+                AnimeCatalogService.AnimePatch.builder().shikimoriId(10L).title("New title").build()));
+
+        assertThat(saved).containsExactly(existing);
+        assertThat(existing.getTitle()).isEqualTo("New title");
+        verify(animeRepository, never()).delete(any());
+    }
+
+    @Test
+    void upsertBatchAbsorbsDraftIntoPersistedTitle() {
+        Anime persisted = anime(5, 4L, null);
+        when(animeRepository.findAllByShikimoriIdIn(any())).thenReturn(Set.of(persisted));
+        when(animeRepository.findAllByMalIdIn(any())).thenReturn(Set.of());
+        stubSaveAll();
+
+        List<Anime> saved = catalog.upsertBatch(List.of(
+                AnimeCatalogService.AnimePatch.builder()
+                        .shikimoriId(3L)
+                        .malId(103L)
+                        .name("Draft")
+                        .build(),
+                AnimeCatalogService.AnimePatch.builder()
+                        .shikimoriId(4L)
+                        .malId(103L)
+                        .name("Real")
+                        .build()));
+
+        assertThat(saved).containsExactly(persisted);
+        assertThat(persisted.getMalId()).isEqualTo(103L);
+        assertThat(persisted.getName()).isEqualTo("Draft");
+        verify(userAnimeRepository, never()).transferUserAnime(any(), any());
+        verify(animeRepository, never()).delete(any());
+    }
+
+    @Test
+    void upsertBatchMergesPersistedDuplicatesAndRepointsLookup() {
+        Anime keep = anime(1, 10L, null);
+        Anime drop = anime(2, 11L, 20L);
+        when(animeRepository.findAllByShikimoriIdIn(any())).thenReturn(Set.of(keep, drop));
+        when(animeRepository.findAllByMalIdIn(any())).thenReturn(Set.of(drop));
+        stubSaveAll();
+
+        List<Anime> saved = catalog.upsertBatch(List.of(
+                AnimeCatalogService.AnimePatch.builder()
+                        .shikimoriId(10L)
+                        .malId(20L)
+                        .build(),
+                AnimeCatalogService.AnimePatch.builder()
+                        .shikimoriId(11L)
+                        .title("Late patch")
+                        .build()));
+
+        verify(userAnimeRepository).transferUserAnime(2L, 1L);
+        verify(animeRepository).delete(drop);
+        assertThat(saved).containsExactly(keep);
+        assertThat(keep.getMalId()).isEqualTo(20L);
+        assertThat(keep.getTitle()).isEqualTo("Late patch");
+    }
+
+    @Test
+    void upsertBatchAbsorbsCollidingDrafts() {
+        when(animeRepository.findAllByShikimoriIdIn(any())).thenReturn(Set.of());
+        when(animeRepository.findAllByMalIdIn(any())).thenReturn(Set.of());
+        stubSaveAll();
+
+        List<Anime> saved = catalog.upsertBatch(List.of(
+                AnimeCatalogService.AnimePatch.builder()
+                        .shikimoriId(3L)
+                        .name("By shikimori")
+                        .build(),
+                AnimeCatalogService.AnimePatch.builder().malId(103L).name("By mal").build(),
+                AnimeCatalogService.AnimePatch.builder()
+                        .shikimoriId(3L)
+                        .malId(103L)
+                        .build()));
+
+        assertThat(saved).hasSize(1);
+        assertThat(saved.get(0).getShikimoriId()).isEqualTo(3L);
+        assertThat(saved.get(0).getMalId()).isEqualTo(103L);
+        verify(userAnimeRepository, never()).transferUserAnime(any(), any());
+        verify(animeRepository, never()).delete(any());
+    }
+
+    private void stubSaveAll() {
+        when(animeRepository.saveAll(any())).thenAnswer(invocation -> {
+            Iterable<Anime> entities = invocation.getArgument(0);
+            List<Anime> result = new ArrayList<>();
+            entities.forEach(result::add);
+            return result;
+        });
     }
 
     private static Anime anime(long id, Long shikimoriId, Long malId) {

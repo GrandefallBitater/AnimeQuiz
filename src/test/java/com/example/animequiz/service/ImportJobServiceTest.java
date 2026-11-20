@@ -145,8 +145,7 @@ class ImportJobServiceTest {
 
         service.runSiteImportAsync(1L);
 
-        verify(catalog).upsert(first);
-        verify(catalog).upsert(second);
+        verify(catalog).upsertBatch(List.of(first, second));
         verify(enrichmentWorker).trigger();
         assertThat(job.getState()).isEqualTo("done");
         assertThat(job.getFinishedAt()).isNotNull();

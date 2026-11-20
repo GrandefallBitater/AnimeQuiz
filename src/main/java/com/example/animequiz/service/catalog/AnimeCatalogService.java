@@ -3,9 +3,6 @@ package com.example.animequiz.service.catalog;
 import com.example.animequiz.entity.Anime;
 import com.example.animequiz.repository.AnimeRepository;
 import com.example.animequiz.repository.UserAnimeRepository;
-
-import java.lang.invoke.MethodHandles;
-import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -78,8 +75,7 @@ public class AnimeCatalogService {
     public List<Anime> upsertBatch(List<AnimePatch> patches) {
         if (patches == null || patches.isEmpty()) return List.of();
 
-        AnimeLookup lookup = buildLookup(
-                loadByShikimoriIds(patches), loadByMalIds(patches), loadByYummyIds(patches));
+        AnimeLookup lookup = buildLookup(loadByShikimoriIds(patches), loadByMalIds(patches), loadByYummyIds(patches));
 
         LinkedHashSet<Anime> candidates = new LinkedHashSet<>();
         for (AnimePatch patch : patches) {
@@ -153,8 +149,8 @@ public class AnimeCatalogService {
         Set<Anime> matches = new LinkedHashSet<>();
 
         addIfPresent(matches, lookup.byShikimoriId(), candidate.shikimoriId());
-        addIfPresent(matches, lookup.byMalId(),       candidate.malId());
-        addIfPresent(matches, lookup.byYummyId(),     candidate.yummyId());
+        addIfPresent(matches, lookup.byMalId(), candidate.malId());
+        addIfPresent(matches, lookup.byYummyId(), candidate.yummyId());
 
         return matches;
     }
@@ -168,11 +164,7 @@ public class AnimeCatalogService {
         }
     }
 
-    private record AnimeLookup(
-            Map<Long, Anime> byShikimoriId,
-            Map<Long, Anime> byMalId,
-            Map<Long, Anime> byYummyId
-    ) {}
+    private record AnimeLookup(Map<Long, Anime> byShikimoriId, Map<Long, Anime> byMalId, Map<Long, Anime> byYummyId) {}
 
     private AnimeLookup buildLookup(Set<Anime> byShiki, Set<Anime> byMal, Set<Anime> byYummy) {
         AnimeLookup lookup = new AnimeLookup(new HashMap<>(), new HashMap<>(), new HashMap<>());

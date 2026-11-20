@@ -180,8 +180,8 @@ public class ImportJobService {
 
             int saved = 0;
             for (int i = 0; i < catalogPatches.size(); i += CATALOG_BATCH) {
-                List<AnimeCatalogService.AnimePatch> chunk = catalogPatches.subList(
-                        i, Math.min(i + CATALOG_BATCH, catalogPatches.size()));
+                List<AnimeCatalogService.AnimePatch> chunk =
+                        catalogPatches.subList(i, Math.min(i + CATALOG_BATCH, catalogPatches.size()));
                 catalog.upsertBatch(chunk);
                 saved += chunk.size();
                 update(

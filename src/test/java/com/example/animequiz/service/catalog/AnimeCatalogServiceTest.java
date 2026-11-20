@@ -249,8 +249,10 @@ class AnimeCatalogServiceTest {
         when(animeRepository.findAllByShikimoriIdIn(any())).thenReturn(Set.of(existing));
         stubSaveAll();
 
-        List<Anime> saved = catalog.upsertBatch(List.of(
-                AnimeCatalogService.AnimePatch.builder().shikimoriId(10L).title("New title").build()));
+        List<Anime> saved = catalog.upsertBatch(List.of(AnimeCatalogService.AnimePatch.builder()
+                .shikimoriId(10L)
+                .title("New title")
+                .build()));
 
         assertThat(saved).containsExactly(existing);
         assertThat(existing.getTitle()).isEqualTo("New title");
@@ -319,7 +321,10 @@ class AnimeCatalogServiceTest {
                         .shikimoriId(3L)
                         .name("By shikimori")
                         .build(),
-                AnimeCatalogService.AnimePatch.builder().malId(103L).name("By mal").build(),
+                AnimeCatalogService.AnimePatch.builder()
+                        .malId(103L)
+                        .name("By mal")
+                        .build(),
                 AnimeCatalogService.AnimePatch.builder()
                         .shikimoriId(3L)
                         .malId(103L)
